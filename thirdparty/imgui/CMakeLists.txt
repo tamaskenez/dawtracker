@@ -29,7 +29,7 @@ target_compile_definitions(imgui PUBLIC
     IMGUI_ENABLE_FREETYPE
 )
 
-target_link_libraries(imgui PRIVATE freetype)
+target_link_libraries(imgui PRIVATE Freetype::Freetype)
     
 install(TARGETS imgui
     EXPORT imgui-targets DESTINATION lib)

@@ -1,11 +1,13 @@
 set(PROJECTS
     IMGUI
     JUCE
+    SDL3
 )
 
 set(JUCE_GIT_REPOSITORY https://github.com/juce-framework/JUCE.git)
 set(JUCE_GIT_BRANCH develop)
 set(IMGUI_GIT_REPOSITORY https://github.com/ocornut/imgui.git)
+set(SDL3_GIT_REPOSITORY https://github.com/libsdl-org/SDL.git)
 
 if(NOT CMAKE_INSTALL_PREFIX)
     message(FATAL_ERROR "Missing CMAKE_INSTALL_PREFIX")
