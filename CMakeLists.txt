@@ -8,7 +8,6 @@ endif()
 set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
 if(BUILD_TESTING)
 	enable_testing()
@@ -24,16 +23,22 @@ find_package(SDL3 REQUIRED CONFIG)
 find_package(freetype REQUIRED CONFIG)
 find_package(OpenGL REQUIRED)
 
+# IMGUI backend
+
+block()
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bd/IMGUI/s)
 set(IMGUI_BACKENDS_DIR ${IMGUI_DIR}/backends)
 
-add_library(imgui_backend STATIC
+set(sources
 	${IMGUI_BACKENDS_DIR}/imgui_impl_opengl3.cpp
 	${IMGUI_BACKENDS_DIR}/imgui_impl_opengl3.h
 	${IMGUI_BACKENDS_DIR}/imgui_impl_opengl3_loader.h
 	${IMGUI_BACKENDS_DIR}/imgui_impl_sdl3.cpp
 	${IMGUI_BACKENDS_DIR}/imgui_impl_sdl3.h
 )
+source_group(TREE ${IMGUI_BACKENDS_DIR} FILES ${sources})
+
+add_library(imgui_backend STATIC ${sources})
 
 target_link_libraries(imgui_backend
 	PUBLIC
@@ -47,9 +52,8 @@ target_include_directories(imgui_backend
 		${IMGUI_BACKENDS_DIR}
 )
 
-include(cmake/warnings_clang.cmake)
-include(cmake/warnings_gcc.cmake)
-include(cmake/warnings_msvc.cmake)
+endblock()
 
-add_compile_definitions(DATA_DIR=\"${CMAKE_CURRENT_LIST_DIR}/data\")
+# Local sources
+
 add_subdirectory(src)

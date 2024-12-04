@@ -1,4 +1,12 @@
-add_executable(main main.cpp)
-target_link_libraries(main PRIVATE
-	imgui_backend
-)
+set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+
+include(${CMAKE_SOURCE_DIR}/cmake/warnings_clang.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/warnings_gcc.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/warnings_msvc.cmake)
+
+add_subdirectory(common)
+add_subdirectory(audio) # knows common
+add_subdirectory(ui) # knows common
+add_subdirectory(app) # knows common, audio, ui
+add_subdirectory(app_main) # knows common, app
+
