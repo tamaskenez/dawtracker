@@ -27,6 +27,7 @@ target_include_directories(imgui PUBLIC
 
 target_compile_definitions(imgui PUBLIC
     IMGUI_ENABLE_FREETYPE
+    IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 )
 
 target_link_libraries(imgui PRIVATE Freetype::Freetype)

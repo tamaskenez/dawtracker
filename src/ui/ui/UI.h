@@ -7,4 +7,5 @@ class UI
 public:
     static unique_ptr<UI> make();
     virtual ~UI() = default;
+    virtual void render() = 0;
 };

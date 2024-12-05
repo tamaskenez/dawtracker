@@ -6,4 +6,8 @@ add_library(common STATIC
 )
 
 target_include_directories(common PUBLIC .)
-
+target_link_libraries(common
+	PUBLIC
+		absl::log
+		fmt::fmt
+)

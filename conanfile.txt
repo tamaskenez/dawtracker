@@ -3,6 +3,7 @@ fmt/11.0.2
 gtest/1.15.0
 abseil/20240722.0
 freetype/2.13.3
+concurrentqueue/1.0.4
 
 [generators]
 CMakeDeps

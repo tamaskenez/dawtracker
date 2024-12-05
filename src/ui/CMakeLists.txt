@@ -10,5 +10,8 @@ target_include_directories(ui PUBLIC .)
 target_link_libraries(ui
 	PUBLIC
 		common
+    PRIVATE
+        imgui::imgui
+        platform
 )
 

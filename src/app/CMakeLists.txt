@@ -13,5 +13,6 @@ target_link_libraries(app
 	PUBLIC
 		common
 		ui
+		platform
 )
 
