@@ -6,7 +6,8 @@ enum class MainMenu {
     quit,
     settings
 };
-namespace audiosettings
+
+namespace AudioSettings
 {
 struct OutputDeviceSelected {
     size_t i;
@@ -14,5 +15,13 @@ struct OutputDeviceSelected {
 struct InputDeviceSelected {
     size_t i;
 };
-} // namespace audiosettings
+using V = variant<OutputDeviceSelected, InputDeviceSelected>;
+} // namespace AudioSettings
+
+namespace AudioEngine
+{
+struct Changed {
+};
+using V = variant<Changed>;
+} // namespace AudioEngine
 } // namespace msg

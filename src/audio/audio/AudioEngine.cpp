@@ -3,6 +3,8 @@
 #include "utility.h"
 
 #include "common/common.h"
+#include "common/msg.h"
+#include "platform/platform.h"
 
 #include "juce_audio_devices/juce_audio_devices.h"
 
@@ -62,11 +64,8 @@ struct AudioEngineImpl
 
     void changeListenerCallback(juce::ChangeBroadcaster* source) override
     {
-        if (source == &deviceManager) {
-            fmt::println("Change from deviceManager");
-        } else {
-            fmt::println("Change from somebody else: {}", fmt::ptr(source));
-        }
+        CHECK_OR_RETURN(source == &deviceManager);
+        sendToApp(MAKE_VARIANT_V(msg::AudioEngine, Changed{}));
     }
 
     void runDispatchLoopUntil(chr::milliseconds d) override
@@ -114,11 +113,15 @@ struct AudioEngineImpl
                 return unexpected(result.toStdString());
             }
         }
+        return getAudioSettings();
+    }
+    AudioSettings getAudioSettings() override
+    {
         auto* cad = deviceManager.getCurrentAudioDevice();
         if (!cad) {
             return AudioSettings{};
         }
-        ads = deviceManager.getAudioDeviceSetup();
+        auto ads = deviceManager.getAudioDeviceSetup();
         bool hasActiveChannels = (ads.outputDeviceName.isNotEmpty() && !ads.outputChannels.isZero())
                               || (ads.inputDeviceName.isNotEmpty() && !ads.inputChannels.isZero());
         fmt::println(

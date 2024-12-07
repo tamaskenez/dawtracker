@@ -13,6 +13,7 @@
 #include <string_view>
 #include <thread>
 #include <utility>
+#include <variant>
 
 namespace chr = std::chrono;
 namespace this_thread = std::this_thread;
@@ -27,4 +28,5 @@ using std::string;
 using std::string_view;
 using std::unexpected;
 using std::unique_ptr;
+using std::variant;
 using std::vector;

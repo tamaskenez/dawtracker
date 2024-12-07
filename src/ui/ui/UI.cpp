@@ -71,7 +71,7 @@ struct UIImpl : public UI {
             if (ImGui::BeginCombo("Output Device", p->selectedOutputDeviceName().c_str())) {
                 for (size_t i : vi::iota(0u, p->outputDeviceNames.size())) {
                     if (ImGui::Selectable(p->outputDeviceNames[i].c_str(), i == p->selectedOutputDeviceIx)) {
-                        sendToApp(msg::audiosettings::OutputDeviceSelected{i});
+                        sendToApp(MAKE_VARIANT_V(msg::AudioSettings, OutputDeviceSelected{i}));
                     }
                 }
                 ImGui::EndCombo();
@@ -79,7 +79,7 @@ struct UIImpl : public UI {
             if (ImGui::BeginCombo("Input Device", p->selectedInputDeviceName().c_str())) {
                 for (size_t i : vi::iota(0u, p->inputDeviceNames.size())) {
                     if (ImGui::Selectable(p->inputDeviceNames[i].c_str(), i == p->selectedInputDeviceIx)) {
-                        sendToApp(msg::audiosettings::InputDeviceSelected{i});
+                        sendToApp(MAKE_VARIANT_V(msg::AudioSettings, InputDeviceSelected{i}));
                     }
                 }
                 ImGui::EndCombo();

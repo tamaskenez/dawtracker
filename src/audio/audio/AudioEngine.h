@@ -12,5 +12,7 @@ public:
     virtual vector<AudioDevice> getAudioDevices() = 0;
     virtual expected<AudioSettings, string>
     initialize(optional<string> outputDeviceName, optional<string> inputDeviceName) = 0;
+    virtual AudioSettings getAudioSettings() = 0;
+
     virtual void runDispatchLoopUntil(chr::milliseconds d) = 0;
 };

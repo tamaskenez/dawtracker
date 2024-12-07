@@ -19,5 +19,7 @@ inline Platform getPlatform()
 }
 
 uint32_t appQueueNotificationSdlEventType();
+uint32_t refreshUISdlEventType();
 void sendToApp(std::any&& payload);
 void sendQuitEventToAppMain();
+void sendRefreshUIEventToAppMain();

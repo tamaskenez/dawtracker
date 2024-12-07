@@ -1,7 +1,6 @@
 #include "App.h"
 
-#include "AppEnv.h"
-#include "Dialog.h"
+#include "AppCtx.h"
 #include "audio/AudioEngine.h"
 #include "common/msg.h"
 #include "platform/Msg.h"
@@ -52,15 +51,76 @@ uistate::AudioSettings refreshSettingsUIState(const vector<AudioDevice>& ads, co
 }
 } // namespace
 
-struct Settings : public Dialog {
-    AppEnv* appEnv;
-    explicit Settings(AppEnv* e)
-        : appEnv(e)
+struct AppImpl
+    : public App
+    , public AppCtx {
+    explicit AppImpl(UI* uiArg)
+        : AppCtx(uiArg)
     {
     }
-    void applyUIStateToAppStateAndAudioEngine()
+
+    void receiveMainMenu(msg::MainMenu m)
     {
-        auto& uas = appEnv->uiState.audioSettings;
+        switch (m) {
+        case msg::MainMenu::quit:
+            sendQuitEventToAppMain();
+            break;
+        case msg::MainMenu::settings:
+            uiState.audioSettings = refreshSettingsUIState(audioEngine->getAudioDevices(), appState.audioSettings);
+            ui->openSettings(&uiState.audioSettings);
+            break;
+        }
+    }
+
+    void receiveAudioSettings(const msg::AudioSettings::V& as)
+    {
+        switch_variant(
+          as,
+          [this](const msg::AudioSettings::OutputDeviceSelected& x) {
+              uiState.audioSettings.selectedOutputDeviceIx = x.i;
+              update_fromUiStateAudioSettings_toAudioEngine_toAppState_toUIState();
+          },
+          [this](const msg::AudioSettings::InputDeviceSelected& x) {
+              uiState.audioSettings.selectedInputDeviceIx = x.i;
+              update_fromUiStateAudioSettings_toAudioEngine_toAppState_toUIState();
+          }
+        );
+    }
+
+    void receive(Msg&& msg) override
+    {
+        auto pl = MOVE(msg.payload);
+
+        if (auto* a = std::any_cast<msg::MainMenu>(&pl)) {
+            receiveMainMenu(*a);
+        } else if (auto* b = std::any_cast<msg::AudioSettings::V>(&pl)) {
+            receiveAudioSettings(*b);
+        } else if (auto* c = std::any_cast<msg::AudioEngine::V>(&pl)) {
+            receiveAudioEngine(*c);
+        } else {
+            LOG(DFATAL) << fmt::format("Invalid message: {}", pl.type().name());
+        }
+    }
+    void receiveAudioEngine(const msg::AudioEngine::V& msg)
+    {
+        switch_variant(msg, [](const msg::AudioEngine::Changed&) {
+
+        });
+    }
+
+    void runAudioEngineDispatchLoop() override
+    {
+        audioEngine->runDispatchLoopUntil(chr::milliseconds(5));
+    }
+    void update_fromAudioEngine_toAppState_toUIState()
+    {
+        appState.audioSettings = audioEngine->getAudioSettings();
+        uiState.audioSettings = refreshSettingsUIState(audioEngine->getAudioDevices(), appState.audioSettings);
+        sendRefreshUIEventToAppMain();
+    }
+    void update_fromUiStateAudioSettings_toAudioEngine_toAppState_toUIState()
+    {
+        auto& uas = uiState.audioSettings;
         bool validIx = isValidIndexOfContainer(uas.selectedOutputDeviceIx, uas.outputDeviceNames);
         LOG_IF(DFATAL, !validIx) << "Invalid selectedOutputDeviceIx";
         if (!validIx) {
@@ -78,74 +138,15 @@ struct Settings : public Dialog {
         if (uas.selectedInputDeviceIx > 0) {
             selectedInputDeviceName = uas.inputDeviceNames[uas.selectedInputDeviceIx];
         }
-        if (auto as = appEnv->audioEngine->initialize(selectedOutputDeviceName, selectedInputDeviceName)) {
-            appEnv->appState.audioSettings = *as;
+        if (auto as = audioEngine->initialize(selectedOutputDeviceName, selectedInputDeviceName)) {
+            appState.audioSettings = *as;
         } else {
-            appEnv->appState.audioSettings = AudioSettings{};
+            appState.audioSettings = AudioSettings{};
             assert(false);
             // Platform::messageBoxError(as.error()); //TODO
         }
-        uas = refreshSettingsUIState(appEnv->audioEngine->getAudioDevices(), appEnv->appState.audioSettings);
-    }
-
-    bool receive(UNUSED std::any&& msg) override
-    {
-        if (auto* a = std::any_cast<msg::audiosettings::OutputDeviceSelected>(&msg)) {
-            appEnv->uiState.audioSettings.selectedOutputDeviceIx = a->i;
-            applyUIStateToAppStateAndAudioEngine();
-            return true;
-        } else if (auto* b = std::any_cast<msg::audiosettings::InputDeviceSelected>(&msg)) {
-            appEnv->uiState.audioSettings.selectedInputDeviceIx = b->i;
-            applyUIStateToAppStateAndAudioEngine();
-            return true;
-        }
-        return false;
-    }
-};
-
-struct MainWindow : public Dialog {
-    AppEnv* appEnv;
-    explicit MainWindow(AppEnv* e)
-        : appEnv(e)
-    {
-    }
-    bool receive(std::any&& msg) override
-    {
-        if (auto* a = std::any_cast<msg::MainMenu>(&msg)) {
-            switch (*a) {
-            case msg::MainMenu::quit:
-                sendQuitEventToAppMain();
-                return true;
-            case msg::MainMenu::settings:
-                appEnv->uiState.audioSettings =
-                  refreshSettingsUIState(appEnv->audioEngine->getAudioDevices(), appEnv->appState.audioSettings);
-                appEnv->ui->openSettings(&appEnv->uiState.audioSettings);
-                appEnv->appUI.dialogs.push_back(make_unique<Settings>(appEnv));
-                return true;
-            }
-        }
-        return false;
-    }
-};
-
-struct AppImpl
-    : public App
-    , public AppEnv {
-    explicit AppImpl(UI* uiArg)
-        : AppEnv(uiArg)
-    {
-        appUI.dialogs.push_back(make_unique<MainWindow>(this));
-    }
-    void receive(Msg&& msg) override
-    {
-        auto pl = MOVE(msg.payload);
-        if (!appUI.receive(MOVE(pl))) {
-            LOG(DFATAL) << fmt::format("Invalid message: {}", pl.type().name());
-        }
-    }
-    void runAudioEngineDispatchLoop() override
-    {
-        audioEngine->runDispatchLoopUntil(chr::milliseconds(5));
+        uas = refreshSettingsUIState(audioEngine->getAudioDevices(), appState.audioSettings);
+        sendRefreshUIEventToAppMain();
     }
 };
 

@@ -1,11 +1,11 @@
-#include "AppEnv.h"
+#include "AppCtx.h"
 
 #include "audio/AudioEngine.h"
 
-AppEnv::AppEnv(UI* uiArg)
+AppCtx::AppCtx(UI* uiArg)
     : ui(uiArg)
     , audioEngine(AudioEngine::make())
 {
 }
 
-AppEnv::~AppEnv() = default;
+AppCtx::~AppCtx() = default;
