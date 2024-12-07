@@ -10,5 +10,6 @@ public:
     virtual ~UI() = default;
     virtual void render() = 0;
     virtual void openSettings(const uistate::AudioSettings* audioSettingsState) = 0;
+    virtual void setMetronome(const uistate::Metronome* metronome) = 0;
     virtual void closeDialogs() = 0;
 };

@@ -4,4 +4,5 @@
 
 struct UIState {
     uistate::AudioSettings audioSettings;
+    uistate::Metronome metronome;
 };

@@ -26,6 +26,7 @@ struct UIImpl : public UI {
     bool show_demo_window = false;
     struct Dialogs {
         optional<const uistate::AudioSettings*> audioSettings;
+        optional<const uistate::Metronome*> metronome;
     } dialogs;
     void render() override
     {
@@ -58,6 +59,17 @@ struct UIImpl : public UI {
         }
         ImGui::Checkbox("Demo Window",
                         &show_demo_window); // Edit bools storing our window open/close state
+        if (dialogs.metronome) {
+            bool on = (*dialogs.metronome)->on;
+            if (ImGui::Checkbox("Metronome", &on)) {
+                sendToApp(MAKE_VARIANT_V(msg::Metronome, On{on}));
+            }
+            float bpm = (*dialogs.metronome)->bpm;
+            if (ImGui::SliderFloat("BPM", &bpm, 32, 320, "%.1f", ImGuiSliderFlags_AlwaysClamp)) {
+                sendToApp(MAKE_VARIANT_V(msg::Metronome, BPM{bpm}));
+            }
+        }
+
         ImGui::End();
 
         bool dialogs_audioSettings_has_value = dialogs.audioSettings.has_value();
@@ -150,6 +162,10 @@ struct UIImpl : public UI {
     void closeDialogs() override
     {
         dialogs = Dialogs{};
+    }
+    void setMetronome(const uistate::Metronome* metronome) override
+    {
+        dialogs.metronome = metronome;
     }
 };
 

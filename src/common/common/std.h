@@ -4,11 +4,15 @@
 #include <any>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <expected>
+#include <functional>
 #include <memory>
+#include <numbers>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -21,9 +25,11 @@ namespace vi = std::ranges::views;
 namespace ra = std::ranges;
 
 using std::expected;
+using std::function;
 using std::make_unique;
 using std::nullopt;
 using std::optional;
+using std::span;
 using std::string;
 using std::string_view;
 using std::unexpected;

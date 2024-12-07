@@ -2,6 +2,7 @@
 
 #include "AppCtx.h"
 #include "audio/AudioEngine.h"
+#include "common/MetronomeGenerator.h"
 #include "common/msg.h"
 #include "platform/Msg.h"
 #include "platform/platform.h"
@@ -57,6 +58,8 @@ struct AppImpl
     explicit AppImpl(UI* uiArg)
         : AppCtx(uiArg)
     {
+        ui->setMetronome(&uiState.metronome);
+        // audioEngine->setAudioCallback(...); //TODO
     }
 
     void receiveMainMenu(msg::MainMenu m)
@@ -87,6 +90,25 @@ struct AppImpl
         );
     }
 
+    void receiveMetronome(const msg::Metronome::V& m)
+    {
+        switch_variant(
+          m,
+          [this](const msg::Metronome::On& x) {
+              uiState.metronome.on = x.b;
+          },
+          [this](const msg::Metronome::BPM& x) {
+              uiState.metronome.bpm = x.bpm;
+          }
+        );
+        sendRefreshUIEventToAppMain();
+    }
+
+    void runAudioEngineDispatchLoop() override
+    {
+        audioEngine->runDispatchLoopUntil(chr::milliseconds(1));
+    }
+
     void receive(Msg&& msg) override
     {
         auto pl = MOVE(msg.payload);
@@ -97,21 +119,20 @@ struct AppImpl
             receiveAudioSettings(*b);
         } else if (auto* c = std::any_cast<msg::AudioEngine::V>(&pl)) {
             receiveAudioEngine(*c);
+        } else if (auto* d = std::any_cast<msg::Metronome::V>(&pl)) {
+            receiveMetronome(*d);
         } else {
             LOG(DFATAL) << fmt::format("Invalid message: {}", pl.type().name());
         }
     }
+
     void receiveAudioEngine(const msg::AudioEngine::V& msg)
     {
-        switch_variant(msg, [](const msg::AudioEngine::Changed&) {
-
+        switch_variant(msg, [this](const msg::AudioEngine::Changed&) {
+            update_fromAudioEngine_toAppState_toUIState();
         });
     }
 
-    void runAudioEngineDispatchLoop() override
-    {
-        audioEngine->runDispatchLoopUntil(chr::milliseconds(5));
-    }
     void update_fromAudioEngine_toAppState_toUIState()
     {
         appState.audioSettings = audioEngine->getAudioSettings();

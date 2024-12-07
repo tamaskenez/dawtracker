@@ -24,4 +24,15 @@ struct Changed {
 };
 using V = variant<Changed>;
 } // namespace AudioEngine
+
+namespace Metronome
+{
+struct On {
+    bool b;
+};
+struct BPM {
+    float bpm;
+};
+using V = variant<On, BPM>;
+} // namespace Metronome
 } // namespace msg

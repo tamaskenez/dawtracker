@@ -50,16 +50,36 @@ string toString(const juce::StringArray& channelNames, const juce::BigInteger& a
 }
 
 struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
+    vector<const float*> inputChannels;
+    vector<float*> outputChannels;
+    AudioCallbackFn callback;
+
     void audioDeviceIOCallbackWithContext(
-      UNUSED const float* const* inputChannelData,
-      UNUSED int numInputChannels,
-      UNUSED float* const* outputChannelData,
-      UNUSED int numOutputChannels,
-      UNUSED int numSamples,
+      const float* const* inputChannelData,
+      int numInputChannels,
+      float* const* outputChannelData,
+      int numOutputChannels,
+      int numSamples,
       UNUSED const juce::AudioIODeviceCallbackContext& context
     ) override
     {
-        NOP;
+        if (!callback) {
+            return;
+        }
+        // Memory allocation but only after device changes when the channel count increases.
+        // We intentionally don't reserve a reasonable (16) channels in the constructor to experience the possible
+        // effects of the memory allocation more often.
+        inputChannels.clear();
+        inputChannels.reserve(size_t(numInputChannels));
+        for (size_t i : vi::iota(0u, size_t(numInputChannels))) {
+            inputChannels.push_back(inputChannelData[i]);
+        }
+        outputChannels.clear();
+        outputChannels.reserve(size_t(numOutputChannels));
+        for (size_t i : vi::iota(0u, size_t(numOutputChannels))) {
+            outputChannels.push_back(outputChannelData[i]);
+        }
+        callback(inputChannels, outputChannels, size_t(numSamples));
     }
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
     {
@@ -160,14 +180,16 @@ struct AudioEngineImpl
           cad->getCurrentBufferSizeSamples()
         );
         fmt::println(
-          "out: {} [{}]",
+          "out: {} [{}], lat: {}",
           ads.outputDeviceName.toStdString(),
-          toString(cad->getOutputChannelNames(), cad->getActiveOutputChannels())
+          toString(cad->getOutputChannelNames(), cad->getActiveOutputChannels()),
+          cad->getOutputLatencyInSamples()
         );
         fmt::println(
-          "out: {} [{}]",
+          "in: {} [{}], lat: {}",
           ads.inputDeviceName.toStdString(),
-          toString(cad->getInputChannelNames(), cad->getActiveInputChannels())
+          toString(cad->getInputChannelNames(), cad->getActiveInputChannels()),
+          cad->getInputLatencyInSamples()
         );
 
         assert(ads.outputChannels == cad->getActiveOutputChannels());
@@ -184,6 +206,11 @@ struct AudioEngineImpl
           .bufferSize = cad->getCurrentBufferSizeSamples(),
           .sampleRate = cad->getCurrentSampleRate()
         };
+    }
+    void setAudioCallback(AudioCallbackFn fn) override
+    {
+        juce::ScopedLock scopedLock(deviceManager.getAudioCallbackLock());
+        deviceCallback.callback = MOVE(fn);
     }
 };
 
