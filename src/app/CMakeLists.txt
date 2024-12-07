@@ -7,12 +7,13 @@ add_library(app STATIC
 
 target_precompile_headers(app PRIVATE src/pch.h)
 
-target_include_directories(app PUBLIC .)
+target_include_directories(app PUBLIC . PRIVATE src)
 
 target_link_libraries(app
 	PUBLIC
 		common
 		ui
 		platform
+        audio
 )
 

@@ -10,3 +10,4 @@ add_subdirectory(audio) # knows common
 add_subdirectory(ui) # knows common, platform
 add_subdirectory(app) # knows common, audio, ui, platform
 add_subdirectory(app_main) # knows common, app, platform
+add_subdirectory(experiments)

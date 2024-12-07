@@ -115,6 +115,12 @@ int main(int, char**)
                     done = true;
                 }
             }
+            app->runAudioEngineDispatchLoop();
+
+            // SDL_Event e;
+            // SDL_zero(e);
+            // e.type = SDL_EVENT_USER;
+            // SDL_PushEvent(&e);
         }
         if (SDL_GetWindowFlags(sdl->window()) & SDL_WINDOW_MINIMIZED) {
             SDL_Delay(10);

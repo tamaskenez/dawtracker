@@ -13,4 +13,5 @@ public:
     virtual ~App() = default;
 
     virtual void receive(Msg&& msg) = 0;
+    virtual void runAudioEngineDispatchLoop() = 0;
 };

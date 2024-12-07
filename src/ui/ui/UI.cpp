@@ -24,6 +24,9 @@ string makeMenuShortcutString(string_view s)
 
 struct UIImpl : public UI {
     bool show_demo_window = false;
+    struct Dialogs {
+        optional<const uistate::AudioSettings*> audioSettings;
+    } dialogs;
     void render() override
     {
         ImGuiIO& io = ImGui::GetIO();
@@ -43,6 +46,9 @@ struct UIImpl : public UI {
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("DawTracker")) {
+                if (ImGui::MenuItem("Settings", makeMenuShortcutString(",").c_str())) {
+                    sendToApp(msg::MainMenu::settings);
+                }
                 if (ImGui::MenuItem("Quit", makeMenuShortcutString("Q").c_str())) {
                     sendToApp(msg::MainMenu::quit);
                 }
@@ -53,6 +59,36 @@ struct UIImpl : public UI {
         ImGui::Checkbox("Demo Window",
                         &show_demo_window); // Edit bools storing our window open/close state
         ImGui::End();
+
+        bool dialogs_audioSettings_has_value = dialogs.audioSettings.has_value();
+        if (dialogs_audioSettings_has_value) {
+            ImGui::Begin(
+              "Settings",
+              &dialogs_audioSettings_has_value,
+              ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings
+            );
+            auto* p = (*dialogs.audioSettings);
+            if (ImGui::BeginCombo("Output Device", p->selectedOutputDeviceName().c_str())) {
+                for (size_t i : vi::iota(0u, p->outputDeviceNames.size())) {
+                    if (ImGui::Selectable(p->outputDeviceNames[i].c_str(), i == p->selectedOutputDeviceIx)) {
+                        sendToApp(msg::audiosettings::OutputDeviceSelected{i});
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::BeginCombo("Input Device", p->selectedInputDeviceName().c_str())) {
+                for (size_t i : vi::iota(0u, p->inputDeviceNames.size())) {
+                    if (ImGui::Selectable(p->inputDeviceNames[i].c_str(), i == p->selectedInputDeviceIx)) {
+                        sendToApp(msg::audiosettings::InputDeviceSelected{i});
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::End();
+        }
+        if (!dialogs_audioSettings_has_value) {
+            dialogs.audioSettings.reset();
+        }
 
         // 1. Show the big demo window (Most of the sample code is in
         // ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear
@@ -106,6 +142,14 @@ struct UIImpl : public UI {
 
         // Rendering
         ImGui::Render();
+    }
+    void openSettings(const uistate::AudioSettings* audioSettingsState) override
+    {
+        dialogs.audioSettings = audioSettingsState;
+    }
+    void closeDialogs() override
+    {
+        dialogs = Dialogs{};
     }
 };
 
