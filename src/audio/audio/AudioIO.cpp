@@ -1,4 +1,4 @@
-#include "AudioEngine.h"
+#include "AudioIO.h"
 
 #include "utility.h"
 
@@ -99,14 +99,14 @@ struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
 
 } // namespace
 
-struct AudioEngineImpl
-    : public AudioEngine
+struct AudioIOImpl
+    : public AudioIO
     , public juce::ChangeListener {
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
     AudioIODeviceCallback deviceCallback;
     juce::AudioDeviceManager deviceManager;
 
-    AudioEngineImpl()
+    AudioIOImpl()
     {
         deviceManager.addChangeListener(this);
         deviceManager.addAudioCallback(&deviceCallback);
@@ -115,7 +115,7 @@ struct AudioEngineImpl
     void changeListenerCallback(juce::ChangeBroadcaster* source) override
     {
         CHECK_OR_RETURN(source == &deviceManager);
-        sendToApp(MAKE_VARIANT_V(msg::AudioEngine, Changed{}));
+        sendToApp(MAKE_VARIANT_V(msg::AudioIO, Changed{}));
     }
 
     void runDispatchLoopUntil(chr::milliseconds d) override
@@ -214,8 +214,8 @@ struct AudioEngineImpl
     }
 };
 
-unique_ptr<AudioEngine> AudioEngine::make()
+unique_ptr<AudioIO> AudioIO::make()
 {
-    LOG_IF(FATAL, s_singleInstanceCreated.exchange(true)) << "There can only be a single instance of AudioEngine.";
-    return make_unique<AudioEngineImpl>();
+    LOG_IF(FATAL, s_singleInstanceCreated.exchange(true)) << "There can only be a single instance of AudioIO.";
+    return make_unique<AudioIOImpl>();
 }

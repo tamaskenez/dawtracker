@@ -7,7 +7,7 @@
 class UI;
 
 // Core app state passed to dialogs.
-class AudioEngine;
+class AudioIO;
 struct AppCtx {
     UI* ui; // To control the UI.
 
@@ -15,7 +15,7 @@ struct AppCtx {
     UIState uiState;   // To provide data to the UI
 
     // Volatile state of the app that can be reconstructed from the essential.
-    unique_ptr<AudioEngine> audioEngine;
+    unique_ptr<AudioIO> audioIO;
 
     explicit AppCtx(UI* uiArg);
     ~AppCtx();

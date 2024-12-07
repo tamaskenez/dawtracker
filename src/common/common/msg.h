@@ -18,12 +18,12 @@ struct InputDeviceSelected {
 using V = variant<OutputDeviceSelected, InputDeviceSelected>;
 } // namespace AudioSettings
 
-namespace AudioEngine
+namespace AudioIO
 {
 struct Changed {
 };
 using V = variant<Changed>;
-} // namespace AudioEngine
+} // namespace AudioIO
 
 namespace Metronome
 {

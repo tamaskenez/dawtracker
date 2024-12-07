@@ -5,12 +5,12 @@
 using AudioCallbackFn =
   function<void(span<const float*> inputChannels, span<float*> outputChannels, size_t numSamples)>;
 
-class AudioEngine
+class AudioIO
 {
 public:
-    static unique_ptr<AudioEngine> make();
+    static unique_ptr<AudioIO> make();
 
-    virtual ~AudioEngine() = default;
+    virtual ~AudioIO() = default;
 
     virtual vector<AudioDevice> getAudioDevices() = 0;
     virtual expected<AudioSettings, string>

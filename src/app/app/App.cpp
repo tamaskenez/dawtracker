@@ -1,7 +1,7 @@
 #include "App.h"
 
 #include "AppCtx.h"
-#include "audio/AudioEngine.h"
+#include "audio/AudioIO.h"
 #include "common/MetronomeGenerator.h"
 #include "common/msg.h"
 #include "platform/Msg.h"
@@ -59,7 +59,7 @@ struct AppImpl
         : AppCtx(uiArg)
     {
         ui->setMetronome(&uiState.metronome);
-        // audioEngine->setAudioCallback(...); //TODO
+        // audioIO->setAudioCallback(...); //TODO
     }
 
     void receiveMainMenu(msg::MainMenu m)
@@ -69,7 +69,7 @@ struct AppImpl
             sendQuitEventToAppMain();
             break;
         case msg::MainMenu::settings:
-            uiState.audioSettings = refreshSettingsUIState(audioEngine->getAudioDevices(), appState.audioSettings);
+            uiState.audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
             ui->openSettings(&uiState.audioSettings);
             break;
         }
@@ -81,11 +81,11 @@ struct AppImpl
           as,
           [this](const msg::AudioSettings::OutputDeviceSelected& x) {
               uiState.audioSettings.selectedOutputDeviceIx = x.i;
-              update_fromUiStateAudioSettings_toAudioEngine_toAppState_toUIState();
+              update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState();
           },
           [this](const msg::AudioSettings::InputDeviceSelected& x) {
               uiState.audioSettings.selectedInputDeviceIx = x.i;
-              update_fromUiStateAudioSettings_toAudioEngine_toAppState_toUIState();
+              update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState();
           }
         );
     }
@@ -104,9 +104,9 @@ struct AppImpl
         sendRefreshUIEventToAppMain();
     }
 
-    void runAudioEngineDispatchLoop() override
+    void runAudioIODispatchLoop() override
     {
-        audioEngine->runDispatchLoopUntil(chr::milliseconds(1));
+        audioIO->runDispatchLoopUntil(chr::milliseconds(1));
     }
 
     void receive(Msg&& msg) override
@@ -117,8 +117,8 @@ struct AppImpl
             receiveMainMenu(*a);
         } else if (auto* b = std::any_cast<msg::AudioSettings::V>(&pl)) {
             receiveAudioSettings(*b);
-        } else if (auto* c = std::any_cast<msg::AudioEngine::V>(&pl)) {
-            receiveAudioEngine(*c);
+        } else if (auto* c = std::any_cast<msg::AudioIO::V>(&pl)) {
+            receiveAudioIO(*c);
         } else if (auto* d = std::any_cast<msg::Metronome::V>(&pl)) {
             receiveMetronome(*d);
         } else {
@@ -126,20 +126,20 @@ struct AppImpl
         }
     }
 
-    void receiveAudioEngine(const msg::AudioEngine::V& msg)
+    void receiveAudioIO(const msg::AudioIO::V& msg)
     {
-        switch_variant(msg, [this](const msg::AudioEngine::Changed&) {
-            update_fromAudioEngine_toAppState_toUIState();
+        switch_variant(msg, [this](const msg::AudioIO::Changed&) {
+            update_fromAudioIO_toAppState_toUIState();
         });
     }
 
-    void update_fromAudioEngine_toAppState_toUIState()
+    void update_fromAudioIO_toAppState_toUIState()
     {
-        appState.audioSettings = audioEngine->getAudioSettings();
-        uiState.audioSettings = refreshSettingsUIState(audioEngine->getAudioDevices(), appState.audioSettings);
+        appState.audioSettings = audioIO->getAudioSettings();
+        uiState.audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
         sendRefreshUIEventToAppMain();
     }
-    void update_fromUiStateAudioSettings_toAudioEngine_toAppState_toUIState()
+    void update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState()
     {
         auto& uas = uiState.audioSettings;
         bool validIx = isValidIndexOfContainer(uas.selectedOutputDeviceIx, uas.outputDeviceNames);
@@ -159,14 +159,14 @@ struct AppImpl
         if (uas.selectedInputDeviceIx > 0) {
             selectedInputDeviceName = uas.inputDeviceNames[uas.selectedInputDeviceIx];
         }
-        if (auto as = audioEngine->initialize(selectedOutputDeviceName, selectedInputDeviceName)) {
+        if (auto as = audioIO->initialize(selectedOutputDeviceName, selectedInputDeviceName)) {
             appState.audioSettings = *as;
         } else {
             appState.audioSettings = AudioSettings{};
             assert(false);
             // Platform::messageBoxError(as.error()); //TODO
         }
-        uas = refreshSettingsUIState(audioEngine->getAudioDevices(), appState.audioSettings);
+        uas = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
         sendRefreshUIEventToAppMain();
     }
 };

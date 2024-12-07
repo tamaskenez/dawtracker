@@ -117,7 +117,7 @@ int main(int, char**)
                     done = true;
                 }
             }
-            app->runAudioEngineDispatchLoop();
+            app->runAudioIODispatchLoop();
 
             // SDL_Event e;
             // SDL_zero(e);
