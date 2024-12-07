@@ -49,17 +49,47 @@ string toString(const juce::StringArray& channelNames, const juce::BigInteger& a
     return fmt::format("{}", fmt::join(s, " "));
 }
 
+struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
+    void audioDeviceIOCallbackWithContext(
+      UNUSED const float* const* inputChannelData,
+      UNUSED int numInputChannels,
+      UNUSED float* const* outputChannelData,
+      UNUSED int numOutputChannels,
+      UNUSED int numSamples,
+      UNUSED const juce::AudioIODeviceCallbackContext& context
+    ) override
+    {
+        NOP;
+    }
+    void audioDeviceAboutToStart(juce::AudioIODevice* device) override
+    {
+        fmt::println("audioDeviceAboutToStart {}", device->getName().toStdString());
+    }
+
+    void audioDeviceStopped() override
+    {
+        fmt::println("audioDeviceStopped");
+    }
+
+    void audioDeviceError(const juce::String& errorMessage) override
+    {
+        fmt::println("ERROR(audioDevice): {}", errorMessage.toStdString());
+    }
+};
+
 } // namespace
 
 struct AudioEngineImpl
     : public AudioEngine
     , public juce::ChangeListener {
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
+    AudioIODeviceCallback deviceCallback;
     juce::AudioDeviceManager deviceManager;
 
     AudioEngineImpl()
     {
         deviceManager.addChangeListener(this);
+        deviceManager.addAudioCallback(&deviceCallback);
     }
 
     void changeListenerCallback(juce::ChangeBroadcaster* source) override
@@ -125,7 +155,7 @@ struct AudioEngineImpl
         bool hasActiveChannels = (ads.outputDeviceName.isNotEmpty() && !ads.outputChannels.isZero())
                               || (ads.inputDeviceName.isNotEmpty() && !ads.inputChannels.isZero());
         fmt::println(
-          "Recived new AudioDeviceSetup, fs: {} Hz, buffer: {}",
+          "Received new AudioDeviceSetup, fs: {} Hz, buffer: {}",
           cad->getCurrentSampleRate(),
           cad->getCurrentBufferSizeSamples()
         );

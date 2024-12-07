@@ -105,9 +105,9 @@ int main(int, char**)
                 if (auto msg = MsgQueue::globalAppQueue()->dequeue()) {
                     app->receive(MOVE(*msg));
                 }
-            } else if(event.type == refreshUISdlEventType()) {
+            } else if (event.type == refreshUISdlEventType()) {
                 // Nothing to do, UI will be repainted below.
-            }else {
+            } else {
                 ImGui_ImplSDL3_ProcessEvent(&event);
                 if (event.type == SDL_EVENT_QUIT) {
                     done = true;
