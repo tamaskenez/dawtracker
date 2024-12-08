@@ -4,6 +4,7 @@
 
 AppCtx::AppCtx(UI* uiArg)
     : ui(uiArg)
+    , audioEngine(AudioEngine::make())
     , audioIO(AudioIO::make())
 {
 }

@@ -23,6 +23,7 @@ find_package(SDL3 REQUIRED CONFIG)
 find_package(freetype REQUIRED CONFIG)
 find_package(OpenGL REQUIRED)
 find_package(concurrentqueue REQUIRED)
+find_package(readerwriterqueue REQUIRED)
 
 # IMGUI backend
 

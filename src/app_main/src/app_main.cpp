@@ -1,7 +1,7 @@
 #include "app/App.h"
 #include "common/common.h"
 #include "common/msg.h"
-#include "platform/MsgQueue.h"
+#include "platform/AppMsgQueue.h"
 #include "platform/SDL.h"
 #include "platform/platform.h"
 #include "ui/UI.h"
@@ -73,10 +73,13 @@ int main(int, char**)
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    auto gaq = MsgQueue::make();
-    gaq->makeThisGlobalAppQueue(true);
     auto ui = UI::make();
     auto app = App::make(ui.get());
+
+    auto amq = AppMsgQueue::make([app_ = app.get()](std::any&& msg) {
+        app_->receive(MOVE(msg));
+    });
+    amq->makeThisGlobalAppQueue(true);
 
     // Main loop
     bool done = false;
@@ -102,9 +105,7 @@ int main(int, char**)
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == appQueueNotificationSdlEventType()) {
-                if (auto msg = MsgQueue::globalAppQueue()->dequeue()) {
-                    app->receive(MOVE(*msg));
-                }
+                tryDequeueAndMakeAppReceiveIt();
             } else if (event.type == refreshUISdlEventType()) {
                 // Nothing to do, UI will be repainted below.
             } else {
@@ -150,7 +151,7 @@ int main(int, char**)
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
 
-    gaq->makeThisGlobalAppQueue(false);
+    amq->makeThisGlobalAppQueue(false);
 
     return 0;
 }

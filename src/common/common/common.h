@@ -6,6 +6,7 @@
 #include "absl/log/log.h"
 #include "fmt/format.h"
 #include "fmt/ranges.h"
+#include "fmt/std.h"
 
 #define MOVE(X) std::move(X)
 

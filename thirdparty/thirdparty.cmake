@@ -36,11 +36,14 @@ foreach(project IN LISTS PROJECTS)
     if(NOT IS_DIRECTORY ${s})
         if(DEFINED ${project}_GIT_BRANCH)
             set(git_branch_option --branch ${${project}_GIT_BRANCH})
+        else()
+            unset(git_branch_option)
         endif()
         execute_process(
             COMMAND ${GIT_EXECUTABLE}
                 clone --depth 1 ${git_branch_option}
                     ${${project}_GIT_REPOSITORY} ${s}
+            COMMAND_ECHO STDOUT
             COMMAND_ERROR_IS_FATAL ANY
         )
     else()

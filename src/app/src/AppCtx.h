@@ -4,6 +4,8 @@
 #include "UIState.h"
 #include "common/audiodevicetypes.h"
 
+#include "audio/AudioEngine.h"
+
 class UI;
 
 // Core app state passed to dialogs.
@@ -14,6 +16,7 @@ struct AppCtx {
     AppState appState; // Essential state of the app.
     UIState uiState;   // To provide data to the UI
 
+    unique_ptr<AudioEngine> audioEngine;
     // Volatile state of the app that can be reconstructed from the essential.
     unique_ptr<AudioIO> audioIO;
 

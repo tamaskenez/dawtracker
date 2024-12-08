@@ -4,7 +4,6 @@
 #include "audio/AudioIO.h"
 #include "common/MetronomeGenerator.h"
 #include "common/msg.h"
-#include "platform/Msg.h"
 #include "platform/platform.h"
 #include "ui/UI.h"
 
@@ -58,8 +57,20 @@ struct AppImpl
     explicit AppImpl(UI* uiArg)
         : AppCtx(uiArg)
     {
+        println("main thread: {}", this_thread::get_id());
         ui->setMetronome(&uiState.metronome);
-        // audioIO->setAudioCallback(...); //TODO
+        audioIO->setCallbacks(
+          [audioEngine_ = audioEngine.get()](double sampleRate, size_t bufferSize) {
+              audioEngine_->audioCallbacksAboutToStart(sampleRate, bufferSize);
+          },
+          [audioEngine_ =
+             audioEngine.get()](span<const float*> inputChannels, span<float*> outputChannels, size_t numSamples) {
+              audioEngine_->process(inputChannels, outputChannels, numSamples);
+          },
+          [audioEngine_ = audioEngine.get()]() {
+              audioEngine_->audioCallbacksStopped();
+          }
+        );
     }
 
     void receiveMainMenu(msg::MainMenu m)
@@ -109,20 +120,18 @@ struct AppImpl
         audioIO->runDispatchLoopUntil(chr::milliseconds(1));
     }
 
-    void receive(Msg&& msg) override
+    void receive(std::any&& msg) override
     {
-        auto pl = MOVE(msg.payload);
-
-        if (auto* a = std::any_cast<msg::MainMenu>(&pl)) {
+        if (auto* a = std::any_cast<msg::MainMenu>(&msg)) {
             receiveMainMenu(*a);
-        } else if (auto* b = std::any_cast<msg::AudioSettings::V>(&pl)) {
+        } else if (auto* b = std::any_cast<msg::AudioSettings::V>(&msg)) {
             receiveAudioSettings(*b);
-        } else if (auto* c = std::any_cast<msg::AudioIO::V>(&pl)) {
+        } else if (auto* c = std::any_cast<msg::AudioIO::V>(&msg)) {
             receiveAudioIO(*c);
-        } else if (auto* d = std::any_cast<msg::Metronome::V>(&pl)) {
+        } else if (auto* d = std::any_cast<msg::Metronome::V>(&msg)) {
             receiveMetronome(*d);
         } else {
-            LOG(DFATAL) << fmt::format("Invalid message: {}", pl.type().name());
+            LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
         }
     }
 

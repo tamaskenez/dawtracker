@@ -4,7 +4,7 @@
 
 #include "common/common.h"
 #include "common/msg.h"
-#include "platform/platform.h"
+#include "platform/AppMsgQueue.h"
 
 #include "juce_audio_devices/juce_audio_devices.h"
 
@@ -52,7 +52,9 @@ string toString(const juce::StringArray& channelNames, const juce::BigInteger& a
 struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
     vector<const float*> inputChannels;
     vector<float*> outputChannels;
-    AudioCallbackFn callback;
+    AudioCallbacksAboutToStartFn callbacksAboutToStartCallback;
+    AudioCallbackFn audioCallback;
+    AudioCallbacksStoppedFn callbacksStoppedcallback;
 
     void audioDeviceIOCallbackWithContext(
       const float* const* inputChannelData,
@@ -63,7 +65,7 @@ struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
       UNUSED const juce::AudioIODeviceCallbackContext& context
     ) override
     {
-        if (!callback) {
+        if (!audioCallback) {
             return;
         }
         // Memory allocation but only after device changes when the channel count increases.
@@ -79,16 +81,22 @@ struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
         for (size_t i : vi::iota(0u, size_t(numOutputChannels))) {
             outputChannels.push_back(outputChannelData[i]);
         }
-        callback(inputChannels, outputChannels, size_t(numSamples));
+        audioCallback(inputChannels, outputChannels, size_t(numSamples));
     }
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
     {
-        fmt::println("audioDeviceAboutToStart {}", device->getName().toStdString());
+        if (callbacksAboutToStartCallback) {
+            callbacksAboutToStartCallback(
+              device->getCurrentSampleRate(), size_t(device->getCurrentBufferSizeSamples())
+            );
+        }
     }
 
     void audioDeviceStopped() override
     {
-        fmt::println("audioDeviceStopped");
+        if (callbacksStoppedcallback) {
+            callbacksStoppedcallback();
+        }
     }
 
     void audioDeviceError(const juce::String& errorMessage) override
@@ -207,10 +215,14 @@ struct AudioIOImpl
           .sampleRate = cad->getCurrentSampleRate()
         };
     }
-    void setAudioCallback(AudioCallbackFn fn) override
+    void setCallbacks(
+      AudioCallbacksAboutToStartFn startFn, AudioCallbackFn callbackFn, AudioCallbacksStoppedFn stoppedFn
+    ) override
     {
         juce::ScopedLock scopedLock(deviceManager.getAudioCallbackLock());
-        deviceCallback.callback = MOVE(fn);
+        deviceCallback.callbacksAboutToStartCallback = MOVE(startFn);
+        deviceCallback.audioCallback = MOVE(callbackFn);
+        deviceCallback.callbacksStoppedcallback = MOVE(stoppedFn);
     }
 };
 

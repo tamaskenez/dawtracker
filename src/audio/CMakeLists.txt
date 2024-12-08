@@ -11,5 +11,6 @@ target_link_libraries(audio
     PRIVATE
         platform
         jucemodules
+        readerwriterqueue::readerwriterqueue
 )
 

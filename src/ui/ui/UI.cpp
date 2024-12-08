@@ -1,6 +1,7 @@
 #include "UI.h"
 
 #include "common/msg.h"
+#include "platform/AppMsgQueue.h"
 
 #include "imgui.h"
 

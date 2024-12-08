@@ -4,6 +4,7 @@ gtest/1.15.0
 abseil/20240722.0
 freetype/2.13.3
 concurrentqueue/1.0.4
+readerwriterqueue/1.0.6
 
 [generators]
 CMakeDeps
