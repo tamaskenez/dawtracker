@@ -59,18 +59,20 @@ struct AppImpl
     {
         println("main thread: {}", this_thread::get_id());
         ui->setMetronome(&uiState.metronome);
-        audioIO->setCallbacks(
-          [audioEngine_ = audioEngine.get()](double sampleRate, size_t bufferSize) {
-              audioEngine_->audioCallbacksAboutToStart(sampleRate, bufferSize);
-          },
-          [audioEngine_ =
-             audioEngine.get()](span<const float*> inputChannels, span<float*> outputChannels, size_t numSamples) {
-              audioEngine_->process(inputChannels, outputChannels, numSamples);
-          },
-          [audioEngine_ = audioEngine.get()]() {
-              audioEngine_->audioCallbacksStopped();
-          }
-        );
+        audioIO->setAudioCallback([audioEngine_ = audioEngine.get()](
+                                    span<const float*> inputChannels, span<float*> outputChannels, size_t numSamples
+                                  ) {
+            audioEngine_->process(inputChannels, outputChannels, numSamples);
+        });
+        audioEngineUpdateMetronome();
+    }
+
+    void audioEngineUpdateMetronome()
+    {
+        audioEngine->sendStateChangerFn([this](AudioEngineState& s) {
+            s.metronome.on = uiState.metronome.on;
+            s.metronome.bpm = uiState.metronome.bpm;
+        });
     }
 
     void receiveMainMenu(msg::MainMenu m)
@@ -112,6 +114,7 @@ struct AppImpl
               uiState.metronome.bpm = x.bpm;
           }
         );
+        audioEngineUpdateMetronome();
         sendRefreshUIEventToAppMain();
     }
 
@@ -137,9 +140,18 @@ struct AppImpl
 
     void receiveAudioIO(const msg::AudioIO::V& msg)
     {
-        switch_variant(msg, [this](const msg::AudioIO::Changed&) {
-            update_fromAudioIO_toAppState_toUIState();
-        });
+        switch_variant(
+          msg,
+          [this](const msg::AudioIO::Changed&) {
+              update_fromAudioIO_toAppState_toUIState();
+          },
+          [this](const msg::AudioIO::AudioCallbacksAboutToStart& x) {
+              audioEngine->audioCallbacksAboutToStart(x.sampleRate, x.bufferSize);
+          },
+          [this](const msg::AudioIO::AudioCallbacksStopped&) {
+              audioEngine->audioCallbacksStopped();
+          }
+        );
     }
 
     void update_fromAudioIO_toAppState_toUIState()

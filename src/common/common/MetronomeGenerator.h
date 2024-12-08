@@ -3,8 +3,7 @@
 #include "std.h"
 
 struct MetronomeGenerator {
-    optional<float> bpm;
     double timeSinceLastStart = 0;
 
-    void generateAdd(double fs, span<float> buf);
+    void generate(double fs, float bpm, span<float> buf);
 };

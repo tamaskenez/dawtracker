@@ -5,7 +5,7 @@
 struct AudioEngineState {
     struct Metronome {
         bool on = false;
-        double bpm;
+        float bpm;
     } metronome;
 };
 
@@ -18,7 +18,7 @@ public:
     virtual ~AudioEngine() = default;
 
     // Called on main thread anytime.
-    virtual void sendStateChangerFn(StateChangerFn fn, bool audioCallbackRunning) = 0;
+    virtual void sendStateChangerFn(StateChangerFn fn) = 0;
 
     // Called probably on the audio callback thread but I'm not sure.
     virtual void audioCallbacksAboutToStart(double sampleRate, size_t bufferSize) = 0;

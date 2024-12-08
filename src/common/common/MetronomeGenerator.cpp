@@ -14,17 +14,14 @@ constexpr double f6 = 1484.75;
 constexpr double f7 = 573.69;
 } // namespace
 
-void MetronomeGenerator::generateAdd(double fs, span<float> buf)
+void MetronomeGenerator::generate(double fs, float bpm, span<float> buf)
 {
-    if (!bpm) {
-        return;
-    }
-    double beatInSec = 60.0 / *bpm;
+    double beatInSec = 60.0 / bpm;
     double secPerSample = 1.0 / fs;
     for (size_t i : vi::iota(0u, buf.size())) {
         double envelope = exp(-timeSinceLastStart * lambda);
         double _2pit = 2.0 * std::numbers::pi * timeSinceLastStart;
-        buf[i] += float(tanh(
+        buf[i] = float(tanh(
           volume * envelope
           * (cos(_2pit * f1) + cos(_2pit * f2) + cos(_2pit * f3) + cos(_2pit * f4) + cos(_2pit * f5) + cos(_2pit * f6) + cos(_2pit * f7))
         ));

@@ -22,7 +22,13 @@ namespace AudioIO
 {
 struct Changed {
 };
-using V = variant<Changed>;
+struct AudioCallbacksAboutToStart {
+    double sampleRate;
+    size_t bufferSize;
+};
+struct AudioCallbacksStopped {
+};
+using V = variant<Changed, AudioCallbacksAboutToStart, AudioCallbacksStopped>;
 } // namespace AudioIO
 
 namespace Metronome

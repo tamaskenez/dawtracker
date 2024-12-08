@@ -52,9 +52,7 @@ string toString(const juce::StringArray& channelNames, const juce::BigInteger& a
 struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
     vector<const float*> inputChannels;
     vector<float*> outputChannels;
-    AudioCallbacksAboutToStartFn callbacksAboutToStartCallback;
     AudioCallbackFn audioCallback;
-    AudioCallbacksStoppedFn callbacksStoppedcallback;
 
     void audioDeviceIOCallbackWithContext(
       const float* const* inputChannelData,
@@ -85,18 +83,14 @@ struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
     }
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
     {
-        if (callbacksAboutToStartCallback) {
-            callbacksAboutToStartCallback(
-              device->getCurrentSampleRate(), size_t(device->getCurrentBufferSizeSamples())
-            );
-        }
+        sendToAppSync(msg::AudioIO::V(msg::AudioIO::AudioCallbacksAboutToStart{
+          .sampleRate = device->getCurrentSampleRate(), .bufferSize = size_t(device->getCurrentBufferSizeSamples())
+        }));
     }
 
     void audioDeviceStopped() override
     {
-        if (callbacksStoppedcallback) {
-            callbacksStoppedcallback();
-        }
+        sendToAppSync(MAKE_VARIANT_V(msg::AudioIO, AudioCallbacksStopped{}));
     }
 
     void audioDeviceError(const juce::String& errorMessage) override
@@ -215,14 +209,10 @@ struct AudioIOImpl
           .sampleRate = cad->getCurrentSampleRate()
         };
     }
-    void setCallbacks(
-      AudioCallbacksAboutToStartFn startFn, AudioCallbackFn callbackFn, AudioCallbacksStoppedFn stoppedFn
-    ) override
+    void setAudioCallback(AudioCallbackFn callbackFn) override
     {
         juce::ScopedLock scopedLock(deviceManager.getAudioCallbackLock());
-        deviceCallback.callbacksAboutToStartCallback = MOVE(startFn);
         deviceCallback.audioCallback = MOVE(callbackFn);
-        deviceCallback.callbacksStoppedcallback = MOVE(stoppedFn);
     }
 };
 

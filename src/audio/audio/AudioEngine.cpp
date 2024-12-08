@@ -5,37 +5,41 @@
 
 #include "readerwriterqueue/readerwriterqueue.h"
 
-struct ScopedRaceConditionDetector {
-    std::atomic_bool& thatObjectIsInUse;
-    explicit ScopedRaceConditionDetector(std::atomic_bool& thatObjectIsInUseArg)
-        : thatObjectIsInUse(thatObjectIsInUseArg)
-    {
-        CHECK(!thatObjectIsInUse.exchange(true));
+namespace
+{
+void elementWiseOperatorPlusEquals(span<float> x, span<float> y)
+{
+    CHECK(x.size() == y.size());
+    for (size_t i : vi::iota(0u, x.size())) {
+        x[i] += y[i];
     }
-    ~ScopedRaceConditionDetector()
-    {
-        thatObjectIsInUse.store(false);
-    }
-};
+}
+} // namespace
 
 struct AudioEngineImpl : public AudioEngine {
-    std::atomic_bool thisObjectIsInUse;
-    AudioEngineState state;
     moodycamel::ReaderWriterQueue<StateChangerFn> mainToCallbackThreadQueue;
 
-    MetronomeGenerator metronome;
+    // Following variables will accessed on the audio callback thread.
+    std::atomic_bool audioCallbacksRunning;
     double sampleRate = 0;
     size_t bufferSize = 0;
+    AudioEngineState state;
+    MetronomeGenerator metronome;
+    vector<float> metronomeBuffer;
 
     void audioCallbacksAboutToStart(double sampleRateArg, size_t bufferSizeArg) override
     {
         fmt::println("audioCallbacksAboutToStart thread: {}", this_thread::get_id());
         sampleRate = sampleRateArg;
         bufferSize = bufferSizeArg;
+        metronome.timeSinceLastStart = 0;
+        metronomeBuffer.resize(bufferSize);
+        audioCallbacksRunning = true;
     }
 
     void audioCallbacksStopped() override
     {
+        audioCallbacksRunning = false;
         fmt::println("audioCallbacksStopped thread: {}", this_thread::get_id());
         processMainToCallbackThreadQueue();
     }
@@ -44,12 +48,22 @@ struct AudioEngineImpl : public AudioEngine {
     void process(UNUSED span<const float*> inputChannels, UNUSED span<float*> outputChannels, UNUSED size_t numSamples)
       override
     {
-        static bool printed = false;
-        if (!printed) {
-            fmt::println("process thread: {}", this_thread::get_id());
-            printed = true;
+        for (auto oc : outputChannels) {
+            std::fill(oc, oc + numSamples, 0);
         }
-        ScopedRaceConditionDetector rcd(thisObjectIsInUse);
+        if (!audioCallbacksRunning) {
+            assert(false);
+            return;
+        }
+        processMainToCallbackThreadQueue();
+
+        if (state.metronome.on) {
+            assert(metronomeBuffer.size() == numSamples);
+            metronome.generate(sampleRate, state.metronome.bpm, metronomeBuffer);
+            for (auto oc : outputChannels) {
+                elementWiseOperatorPlusEquals(span<float>(oc, numSamples), metronomeBuffer);
+            }
+        }
     }
 
     void processMainToCallbackThreadQueue()
@@ -60,10 +74,10 @@ struct AudioEngineImpl : public AudioEngine {
         }
     }
 
-    void sendStateChangerFn(StateChangerFn fn, bool audioCallbackRunning) override
+    void sendStateChangerFn(StateChangerFn fn) override
     {
         mainToCallbackThreadQueue.enqueue(MOVE(fn));
-        if (!audioCallbackRunning) {
+        if (!audioCallbacksRunning) {
             processMainToCallbackThreadQueue();
         }
     }
