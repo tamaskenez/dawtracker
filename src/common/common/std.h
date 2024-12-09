@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <any>
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <deque>
 #include <expected>
 #include <functional>
 #include <memory>
@@ -24,6 +26,8 @@ namespace this_thread = std::this_thread;
 namespace vi = std::ranges::views;
 namespace ra = std::ranges;
 
+using std::array;
+using std::deque;
 using std::expected;
 using std::function;
 using std::make_unique;

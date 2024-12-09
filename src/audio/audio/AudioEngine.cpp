@@ -2,11 +2,15 @@
 
 #include "common/MetronomeGenerator.h"
 #include "common/common.h"
+#include "common/msg.h"
+#include "platform/AppMsgQueue.h"
 
 #include "readerwriterqueue/readerwriterqueue.h"
 
 namespace
 {
+constexpr size_t k_numRecordingBuffers = 7;
+
 void elementWiseOperatorPlusEquals(span<float> x, span<float> y)
 {
     CHECK(x.size() == y.size());
@@ -26,21 +30,25 @@ struct AudioEngineImpl : public AudioEngine {
     AudioEngineState state;
     MetronomeGenerator metronome;
     vector<float> metronomeBuffer;
-
-    void audioCallbacksAboutToStart(double sampleRateArg, size_t bufferSizeArg) override
+    array<RecordingBuffer, k_numRecordingBuffers> recordingBuffers;
+    std::atomic_bool recording;
+    void audioCallbacksAboutToStart(double sampleRateArg, size_t bufferSizeArg, size_t numInputChannels) override
     {
-        fmt::println("audioCallbacksAboutToStart thread: {}", this_thread::get_id());
+        LOG(INFO) << fmt::format("audioCallbacksAboutToStart thread: {}", this_thread::get_id());
         sampleRate = sampleRateArg;
         bufferSize = bufferSizeArg;
         metronome.timeSinceLastStart = 0;
         metronomeBuffer.resize(bufferSize);
         audioCallbacksRunning = true;
+        for (auto& rb : recordingBuffers) {
+            rb.initialize(numInputChannels, bufferSize);
+        }
     }
 
     void audioCallbacksStopped() override
     {
         audioCallbacksRunning = false;
-        fmt::println("audioCallbacksStopped thread: {}", this_thread::get_id());
+        LOG(INFO) << fmt::format("audioCallbacksStopped thread: {}", this_thread::get_id());
         processMainToCallbackThreadQueue();
     }
 
@@ -64,6 +72,26 @@ struct AudioEngineImpl : public AudioEngine {
                 elementWiseOperatorPlusEquals(span<float>(oc, numSamples), metronomeBuffer);
             }
         }
+        if (recording) {
+            RecordingBuffer* recordingBuffer{};
+            for (auto& rb : recordingBuffers) {
+                if (!rb.sentToApp) {
+                    recordingBuffer = &rb;
+                    break;
+                }
+            }
+            if (!recordingBuffer) {
+                sendToApp(MAKE_VARIANT_V(msg::AudioEngine, NoFreeRecordingBuffer{}));
+            } else {
+                CHECK(inputChannels.size() == recordingBuffer->channels.size());
+                for (size_t i : vi::iota(0u, inputChannels.size())) {
+                    CHECK(numSamples == recordingBuffer->channels[i].size());
+                    std::copy_n(inputChannels[i], bufferSize, recordingBuffer->channels[i].begin());
+                }
+                recordingBuffer->sentToApp = true;
+                sendToApp(MAKE_VARIANT_V(msg::AudioEngine, RecordingBufferRecorded{recordingBuffer}));
+            }
+        }
     }
 
     void processMainToCallbackThreadQueue()
@@ -80,6 +108,11 @@ struct AudioEngineImpl : public AudioEngine {
         if (!audioCallbacksRunning) {
             processMainToCallbackThreadQueue();
         }
+    }
+
+    void record() override
+    {
+        recording = true;
     }
 };
 

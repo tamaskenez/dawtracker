@@ -9,5 +9,6 @@ target_include_directories(common PUBLIC .)
 target_link_libraries(common
 	PUBLIC
 		absl::log
+		absl::log_initialize
 		fmt::fmt
 )

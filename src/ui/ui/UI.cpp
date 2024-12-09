@@ -80,33 +80,33 @@ struct UIImpl : public UI {
                 }
             }
         }
-        if (!uiState.recordButton) {
+        if (!uiState.recordButtonEnabled) {
             ImGui::BeginDisabled();
         }
-        if (ImGui::Button("Record")) {
+        if (ImGui::Checkbox("Record", &uiState.recordButton)) {
             sendToApp(msg::Transport::record);
         }
-        if (!uiState.recordButton) {
+        if (!uiState.recordButtonEnabled) {
             ImGui::EndDisabled();
         }
 
-        if (!uiState.stopButton) {
+        if (!uiState.stopButtonEnabled) {
             ImGui::BeginDisabled();
         }
-        if (ImGui::Button("Stop")) {
+        if (ImGui::Checkbox("Stop", &uiState.stopButton)) {
             sendToApp(msg::Transport::stop);
         }
-        if (!uiState.stopButton) {
+        if (!uiState.stopButtonEnabled) {
             ImGui::EndDisabled();
         }
 
-        if (!uiState.playButton) {
+        if (!uiState.playButtonEnabled) {
             ImGui::BeginDisabled();
         }
-        if (ImGui::Button("Play")) {
+        if (ImGui::Checkbox("Play", &uiState.playButton)) {
             sendToApp(msg::Transport::play);
         }
-        if (!uiState.playButton) {
+        if (!uiState.playButtonEnabled) {
             ImGui::EndDisabled();
         }
 

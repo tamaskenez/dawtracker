@@ -20,6 +20,7 @@ struct UIState {
     bool showAudioSettings = false;
     Metronome metronome;
 
+    bool recordButtonEnabled = false, stopButtonEnabled = false, playButtonEnabled = false;
     bool recordButton = false, stopButton = false, playButton = false;
 
     struct Input {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "RecordingBuffer.h"
+
 namespace msg
 {
 enum class MainMenu {
@@ -25,6 +27,7 @@ struct Changed {
 struct AudioCallbacksAboutToStart {
     double sampleRate;
     size_t bufferSize;
+    size_t numInputChannels;
 };
 struct AudioCallbacksStopped {
 };
@@ -52,4 +55,14 @@ struct InputChanged {
     string name;
     bool enabled;
 };
+
+namespace AudioEngine
+{
+struct NoFreeRecordingBuffer {
+};
+struct RecordingBufferRecorded {
+    RecordingBuffer* recordingBuffer;
+};
+using V = variant<NoFreeRecordingBuffer, RecordingBufferRecorded>;
+} // namespace AudioEngine
 } // namespace msg

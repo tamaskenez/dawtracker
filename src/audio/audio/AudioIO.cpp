@@ -74,7 +74,9 @@ struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
     {
         sendToAppSync(msg::AudioIO::V(msg::AudioIO::AudioCallbacksAboutToStart{
-          .sampleRate = device->getCurrentSampleRate(), .bufferSize = size_t(device->getCurrentBufferSizeSamples())
+          .sampleRate = device->getCurrentSampleRate(),
+          .bufferSize = size_t(device->getCurrentBufferSizeSamples()),
+          .numInputChannels = size_t(device->getActiveInputChannels().countNumberOfSetBits())
         }));
     }
 
@@ -171,26 +173,22 @@ struct AudioIOImpl
         auto ads = deviceManager.getAudioDeviceSetup();
         bool hasActiveChannels = (ads.outputDeviceName.isNotEmpty() && !ads.outputChannels.isZero())
                               || (ads.inputDeviceName.isNotEmpty() && !ads.inputChannels.isZero());
-        fmt::println(
-          "Received new AudioDeviceSetup, fs: {} Hz, buffer: {}",
+        LOG(INFO) << fmt::format(
+          "getAudioSettings ({}Hz/{}) in: {} {}, out {} {}",
           cad->getCurrentSampleRate(),
-          cad->getCurrentBufferSizeSamples()
-        );
-        fmt::println(
-          "out: {} [{}], lat: {}",
+          cad->getCurrentBufferSizeSamples(),
           ads.outputDeviceName.toStdString(),
           toString(cad->getOutputChannelNames(), cad->getActiveOutputChannels()),
-          cad->getOutputLatencyInSamples()
-        );
-        fmt::println(
-          "in: {} [{}], lat: {}",
           ads.inputDeviceName.toStdString(),
-          toString(cad->getInputChannelNames(), cad->getActiveInputChannels()),
-          cad->getInputLatencyInSamples()
+          toString(cad->getInputChannelNames(), cad->getActiveInputChannels())
         );
 
         assert(ads.outputChannels == cad->getActiveOutputChannels());
-        assert(ads.inputChannels == cad->getActiveInputChannels());
+        if (ads.inputChannels != cad->getActiveInputChannels()) {
+            UNUSED auto i1 = ads.inputChannels.toInteger();
+            UNUSED auto i2 = cad->getActiveInputChannels().toInteger();
+            assert(false);
+        }
         if (hasActiveChannels) {
             assert(ads.sampleRate == cad->getCurrentSampleRate());
             assert(ads.bufferSize == cad->getCurrentBufferSizeSamples());
@@ -211,6 +209,7 @@ struct AudioIOImpl
     }
     expected<void, string> enableInput(string_view name, bool enabled) override
     {
+        LOG(INFO) << fmt::format("enableInput(\"{}\", {})", name, enabled);
         auto* cad = deviceManager.getCurrentAudioDevice();
         CHECK_OR_RETURN_VAL(cad, unexpected("[internal error] There's no current audio device."));
         auto icn = cad->getInputChannelNames();

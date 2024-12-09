@@ -1,6 +1,8 @@
 #pragma once
 
 #include "AppState.h"
+
+#include "common/AudioClip.h"
 #include "common/audiodevicetypes.h"
 #include "ui/UIState.h"
 
@@ -17,8 +19,10 @@ struct AppCtx {
     AppState appState; // Essential state of the app.
 
     unique_ptr<AudioEngine> audioEngine;
-    // Volatile state of the app that can be reconstructed from the essential.
+    // Volatile state of the app that can be reconstructed from essential or doesn't need to be reconstructed.
     unique_ptr<AudioIO> audioIO;
+    optional<AudioClip> clipBeingRecorded;
+    vector<AudioClip> clips;
 
     explicit AppCtx(UI* uiArg);
     ~AppCtx();

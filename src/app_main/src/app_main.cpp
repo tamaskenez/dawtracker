@@ -24,6 +24,9 @@
 // Main code
 int main(int, char**)
 {
+    absl::InitializeLog();
+    absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+
     auto sdl = SDL::init();
 
     // Setup Dear ImGui context
@@ -155,7 +158,7 @@ int main(int, char**)
     amq.reset();
 
     amq = AppMsgQueue::make([](std::any&& msg) {
-        LOG(INFO) << fmt::format("Discarded message to app because it's being desctructed: {}", msg.type().name());
+        LOG(INFO) << fmt::format("Discarded message to app because it's being destructed: {}", msg.type().name());
     });
     amq->makeThisGlobalAppQueue(true);
     app.reset();

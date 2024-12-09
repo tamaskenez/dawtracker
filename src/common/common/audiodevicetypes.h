@@ -26,4 +26,9 @@ struct AudioSettings {
     optional<Device> outputDevice, inputDevice;
     int bufferSize = 0;
     double sampleRate = 0;
+
+    bool canRecord() const
+    {
+        return inputDevice && !inputDevice->activeChannels.empty();
+    }
 };

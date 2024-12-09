@@ -20,8 +20,9 @@ public:
     // Called on main thread anytime.
     virtual void sendStateChangerFn(StateChangerFn fn) = 0;
 
-    // Called probably on the audio callback thread but I'm not sure.
-    virtual void audioCallbacksAboutToStart(double sampleRate, size_t bufferSize) = 0;
+    virtual void record() = 0;
+
+    virtual void audioCallbacksAboutToStart(double sampleRate, size_t bufferSize, size_t numInputChannels) = 0;
     virtual void audioCallbacksStopped() = 0;
 
     // Called on the audio callback thread.

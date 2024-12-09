@@ -68,7 +68,14 @@ struct AppImpl
 
     void updateUIStateDerivedFields()
     {
-        uiState->recordButton = appState.audioSettings.inputDevice.has_value();
+        bool clipBeingPlayed = false; // todo
+        uiState->playButtonEnabled = appState.audioSettings.outputDevice.has_value() && !clips.empty()
+                                  && !clipBeingRecorded; // Todo we'll have a list of clips.
+        uiState->playButton = clipBeingPlayed;
+        uiState->recordButtonEnabled = appState.audioSettings.canRecord() && !clipBeingRecorded && !clipBeingPlayed;
+        uiState->recordButton = clipBeingRecorded.has_value();
+        uiState->stopButtonEnabled = clipBeingPlayed || clipBeingRecorded.has_value();
+        uiState->stopButton = clipBeingPlayed || clipBeingRecorded.has_value();
     }
 
     void audioEngineUpdateMetronome()
@@ -133,12 +140,50 @@ struct AppImpl
     {
         switch (t) {
         case msg::Transport::record:
+            CHECK(!clipBeingRecorded);
+            CHECK(appState.audioSettings.canRecord());
+            clipBeingRecorded =
+              AudioClip(appState.audioSettings.sampleRate, appState.audioSettings.inputDevice->activeChannels.size());
+            audioEngine->record();
             break;
-        case msg::Transport::stop:
-            break;
+        case msg::Transport::stop: {
+            bool clipBeingPlayed = false;
+            CHECK(clipBeingPlayed || clipBeingRecorded.has_value());
+            if (clipBeingRecorded) {
+                stopRecording();
+            }
+        } break;
         case msg::Transport::play:
             break;
         }
+        updateUIStateDerivedFields();
+    }
+
+    void stopRecording()
+    {
+        CHECK(clipBeingRecorded);
+        clips.push_back(MOVE(*clipBeingRecorded));
+        clipBeingRecorded.reset();
+        // todo recalculate a few things
+        updateUIStateDerivedFields();
+    }
+
+    void receiveAudioEngine(const msg::AudioEngine::V& msg)
+    {
+        switch_variant(
+          msg,
+          [this](const msg::AudioEngine::NoFreeRecordingBuffer&) {
+              // todo messagebox
+              LOG(ERROR) << "Main thread couldn't keep up with the recording. Recording stopped.";
+              stopRecording();
+          },
+          [this](const msg::AudioEngine::RecordingBufferRecorded& x) {
+              // Add buffer to current clip.
+              CHECK(clipBeingRecorded);
+              clipBeingRecorded->append(*x.recordingBuffer);
+              x.recordingBuffer->sentToApp = false;
+          }
+        );
     }
 
     void receive(std::any&& msg) override
@@ -159,6 +204,8 @@ struct AppImpl
                 LOG(ERROR) << fmt::format("Failed changing input {} to {}: {}", f->name, f->enabled, r.error());
             }
             update_fromAudioIO_toAppState_toUIState();
+        } else if (auto* g = std::any_cast<msg::AudioEngine::V>(&msg)) {
+            receiveAudioEngine(*g);
         } else {
             LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
         }
@@ -172,7 +219,7 @@ struct AppImpl
               update_fromAudioIO_toAppState_toUIState();
           },
           [this](const msg::AudioIO::AudioCallbacksAboutToStart& x) {
-              audioEngine->audioCallbacksAboutToStart(x.sampleRate, x.bufferSize);
+              audioEngine->audioCallbacksAboutToStart(x.sampleRate, x.bufferSize, x.numInputChannels);
           },
           [this](const msg::AudioIO::AudioCallbacksStopped&) {
               audioEngine->audioCallbacksStopped();

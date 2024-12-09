@@ -28,9 +28,22 @@ target_include_directories(imgui PUBLIC
 target_compile_definitions(imgui PUBLIC
     IMGUI_ENABLE_FREETYPE
     IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    IMGUI_DEFINE_MATH_OPERATORS
+    IMGUI_ENABLE_WIN32_DEFAULT_IME_FUNCTIONS
+    IMGUI_ENABLE_OSX_DEFAULT_CLIPBOARD_FUNCTIONS
 )
 
-target_link_libraries(imgui PRIVATE Freetype::Freetype)
+target_link_libraries(imgui
+    PRIVATE
+        Freetype::Freetype
+)
+
+if(APPLE)
+target_link_libraries(imgui
+    PRIVATE
+        $<LINK_LIBRARY:FRAMEWORK,ApplicationServices>
+)
+endif()
     
 install(TARGETS imgui
     EXPORT imgui-targets DESTINATION lib)
