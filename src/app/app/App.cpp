@@ -9,7 +9,7 @@
 
 namespace
 {
-uistate::AudioSettings refreshSettingsUIState(const vector<AudioDevice>& ads, const AudioSettings& as)
+UIState::AudioSettings refreshSettingsUIState(const vector<AudioDevice>& ads, const AudioSettings& as)
 {
     vector<string> ods, ids;
     ods.push_back("None");
@@ -42,7 +42,7 @@ uistate::AudioSettings refreshSettingsUIState(const vector<AudioDevice>& ads, co
         }
     }
 
-    return uistate::AudioSettings{
+    return UIState::AudioSettings{
       .outputDeviceNames = MOVE(ods),
       .inputDeviceNames = MOVE(ids),
       .selectedOutputDeviceIx = sod,
@@ -58,7 +58,6 @@ struct AppImpl
         : AppCtx(uiArg)
     {
         println("main thread: {}", this_thread::get_id());
-        ui->setMetronome(&uiState.metronome);
         audioIO->setAudioCallback([audioEngine_ = audioEngine.get()](
                                     span<const float*> inputChannels, span<float*> outputChannels, size_t numSamples
                                   ) {
@@ -70,8 +69,8 @@ struct AppImpl
     void audioEngineUpdateMetronome()
     {
         audioEngine->sendStateChangerFn([this](AudioEngineState& s) {
-            s.metronome.on = uiState.metronome.on;
-            s.metronome.bpm = uiState.metronome.bpm;
+            s.metronome.on = uiState->metronome.on;
+            s.metronome.bpm = uiState->metronome.bpm;
         });
     }
 
@@ -82,8 +81,9 @@ struct AppImpl
             sendQuitEventToAppMain();
             break;
         case msg::MainMenu::settings:
-            uiState.audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
-            ui->openSettings(&uiState.audioSettings);
+            uiState->audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
+            uiState->showAudioSettings = true;
+            sendRefreshUIEventToAppMain();
             break;
         }
     }
@@ -93,11 +93,11 @@ struct AppImpl
         switch_variant(
           as,
           [this](const msg::AudioSettings::OutputDeviceSelected& x) {
-              uiState.audioSettings.selectedOutputDeviceIx = x.i;
+              uiState->audioSettings.selectedOutputDeviceIx = x.i;
               update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState();
           },
           [this](const msg::AudioSettings::InputDeviceSelected& x) {
-              uiState.audioSettings.selectedInputDeviceIx = x.i;
+              uiState->audioSettings.selectedInputDeviceIx = x.i;
               update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState();
           }
         );
@@ -108,10 +108,10 @@ struct AppImpl
         switch_variant(
           m,
           [this](const msg::Metronome::On& x) {
-              uiState.metronome.on = x.b;
+              uiState->metronome.on = x.b;
           },
           [this](const msg::Metronome::BPM& x) {
-              uiState.metronome.bpm = x.bpm;
+              uiState->metronome.bpm = x.bpm;
           }
         );
         audioEngineUpdateMetronome();
@@ -157,12 +157,12 @@ struct AppImpl
     void update_fromAudioIO_toAppState_toUIState()
     {
         appState.audioSettings = audioIO->getAudioSettings();
-        uiState.audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
+        uiState->audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
         sendRefreshUIEventToAppMain();
     }
     void update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState()
     {
-        auto& uas = uiState.audioSettings;
+        auto& uas = uiState->audioSettings;
         bool validIx = isValidIndexOfContainer(uas.selectedOutputDeviceIx, uas.outputDeviceNames);
         LOG_IF(DFATAL, !validIx) << "Invalid selectedOutputDeviceIx";
         if (!validIx) {

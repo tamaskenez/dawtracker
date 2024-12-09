@@ -41,4 +41,10 @@ struct BPM {
 };
 using V = variant<On, BPM>;
 } // namespace Metronome
+
+enum class Transport {
+    record,
+    stop,
+    play
+};
 } // namespace msg
