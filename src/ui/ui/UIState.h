@@ -21,4 +21,10 @@ struct UIState {
     Metronome metronome;
 
     bool recordButton = false, stopButton = false, playButton = false;
+
+    struct Input {
+        string name;
+        bool enabled;
+    };
+    vector<Input> inputs;
 };

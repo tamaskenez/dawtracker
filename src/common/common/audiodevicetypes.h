@@ -21,7 +21,7 @@ struct AudioSettings {
     struct Device {
         string name;
         vector<string> channelNames;
-        vector<int> activeChannels;
+        vector<size_t> activeChannels;
     };
     optional<Device> outputDevice, inputDevice;
     int bufferSize = 0;

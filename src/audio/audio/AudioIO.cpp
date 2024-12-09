@@ -12,16 +12,6 @@ namespace
 {
 std::atomic_bool s_singleInstanceCreated;
 
-vector<int> toVectorInt(const juce::BigInteger& bi)
-{
-    vector<int> y;
-    y.reserve(size_t(bi.countNumberOfSetBits()));
-    for (int i = bi.findNextSetBit(0); i >= 0; i = bi.findNextSetBit(i + 1)) {
-        y.push_back(i);
-    }
-    return y;
-}
-
 optional<AudioSettings::Device> toAudioSettingsDevice(
   const juce::String& deviceName, const juce::StringArray& channelNames, const juce::BigInteger& activeChannels
 )
@@ -32,7 +22,7 @@ optional<AudioSettings::Device> toAudioSettingsDevice(
     return AudioSettings::Device{
       .name = deviceName.toStdString(),
       .channelNames = toVectorString(channelNames),
-      .activeChannels = toVectorInt(activeChannels)
+      .activeChannels = toVectorSizeT(activeChannels)
     };
 }
 
@@ -112,6 +102,11 @@ struct AudioIOImpl
     {
         deviceManager.addChangeListener(this);
         deviceManager.addAudioCallback(&deviceCallback);
+    }
+    ~AudioIOImpl() override
+    {
+        deviceManager.removeAudioCallback(&deviceCallback);
+        deviceManager.removeChangeListener(this);
     }
 
     void changeListenerCallback(juce::ChangeBroadcaster* source) override
@@ -213,6 +208,38 @@ struct AudioIOImpl
     {
         juce::ScopedLock scopedLock(deviceManager.getAudioCallbackLock());
         deviceCallback.audioCallback = MOVE(callbackFn);
+    }
+    expected<void, string> enableInput(string_view name, bool enabled) override
+    {
+        auto* cad = deviceManager.getCurrentAudioDevice();
+        CHECK_OR_RETURN_VAL(cad, unexpected("[internal error] There's no current audio device."));
+        auto icn = cad->getInputChannelNames();
+        optional<int> requestedChix;
+        for (int chix : vi::iota(0, icn.size())) {
+            if (icn[chix].toStdString() == name) {
+                requestedChix = chix;
+                break;
+            }
+        }
+        auto ads = deviceManager.getAudioDeviceSetup();
+        CHECK_OR_RETURN_VAL(
+          requestedChix,
+          unexpected(fmt::format(
+            "[internal error] Input channel name {} not found in the current input device ({})",
+            name,
+            ads.inputDeviceName.toStdString()
+          ))
+        );
+
+        assert(cad->getActiveInputChannels() == ads.inputChannels);
+        ads.inputChannels.setBit(*requestedChix, enabled);
+        ads.useDefaultInputChannels = false;
+        ads.useDefaultOutputChannels = false;
+        auto result = deviceManager.setAudioDeviceSetup(ads, true);
+        if (result.isNotEmpty()) {
+            return unexpected(result.toStdString());
+        }
+        return {};
     }
 };
 

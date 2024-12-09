@@ -16,3 +16,6 @@ vector<T> toVector(const juce::Array<T>& x)
     }
     return y;
 }
+
+vector<int> toVectorInt(const juce::BigInteger& bi);
+vector<size_t> toVectorSizeT(const juce::BigInteger& bi);

@@ -66,6 +66,11 @@ struct AppImpl
         audioEngineUpdateMetronome();
     }
 
+    void updateUIStateDerivedFields()
+    {
+        uiState->recordButton = appState.audioSettings.inputDevice.has_value();
+    }
+
     void audioEngineUpdateMetronome()
     {
         audioEngine->sendStateChangerFn([this](AudioEngineState& s) {
@@ -101,6 +106,7 @@ struct AppImpl
               update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState();
           }
         );
+        updateUIStateDerivedFields();
     }
 
     void receiveMetronome(const msg::Metronome::V& m)
@@ -123,6 +129,18 @@ struct AppImpl
         audioIO->runDispatchLoopUntil(chr::milliseconds(1));
     }
 
+    void receiveTransport(msg::Transport t)
+    {
+        switch (t) {
+        case msg::Transport::record:
+            break;
+        case msg::Transport::stop:
+            break;
+        case msg::Transport::play:
+            break;
+        }
+    }
+
     void receive(std::any&& msg) override
     {
         if (auto* a = std::any_cast<msg::MainMenu>(&msg)) {
@@ -133,6 +151,14 @@ struct AppImpl
             receiveAudioIO(*c);
         } else if (auto* d = std::any_cast<msg::Metronome::V>(&msg)) {
             receiveMetronome(*d);
+        } else if (auto* e = std::any_cast<msg::Transport>(&msg)) {
+            receiveTransport(*e);
+        } else if (auto* f = std::any_cast<msg::InputChanged>(&msg)) {
+            if (auto r = audioIO->enableInput(f->name, f->enabled); !r) {
+                // TODO: messageBox(r)
+                LOG(ERROR) << fmt::format("Failed changing input {} to {}: {}", f->name, f->enabled, r.error());
+            }
+            update_fromAudioIO_toAppState_toUIState();
         } else {
             LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
         }
@@ -154,10 +180,24 @@ struct AppImpl
         );
     }
 
+    void update_uiStateInputs_from_appStateAudioSettings()
+    {
+        uiState->inputs.clear();
+        if (auto id = appState.audioSettings.inputDevice) {
+            uiState->inputs.reserve(id->channelNames.size());
+            for (auto& n : id->channelNames) {
+                uiState->inputs.push_back(UIState::Input{.name = n, .enabled = false});
+            }
+            for (auto i : id->activeChannels) {
+                uiState->inputs.at(i).enabled = true;
+            }
+        }
+    }
     void update_fromAudioIO_toAppState_toUIState()
     {
         appState.audioSettings = audioIO->getAudioSettings();
         uiState->audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
+        update_uiStateInputs_from_appStateAudioSettings();
         sendRefreshUIEventToAppMain();
     }
     void update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState()
@@ -186,8 +226,15 @@ struct AppImpl
             appState.audioSettings = AudioSettings{};
             assert(false);
             // Platform::messageBoxError(as.error()); //TODO
+            LOG(ERROR) << fmt::format(
+              "Failed to initialize audio devices to output: \"{}\", input: \"{}\": {}",
+              selectedOutputDeviceName.value_or("None"),
+              selectedInputDeviceName.value_or("None"),
+              as.error()
+            );
         }
         uas = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
+        update_uiStateInputs_from_appStateAudioSettings();
         sendRefreshUIEventToAppMain();
     }
 };

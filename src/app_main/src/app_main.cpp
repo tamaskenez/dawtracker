@@ -152,6 +152,15 @@ int main(int, char**)
     ImGui::DestroyContext();
 
     amq->makeThisGlobalAppQueue(false);
+    amq.reset();
+
+    amq = AppMsgQueue::make([](std::any&& msg) {
+        LOG(INFO) << fmt::format("Discarded message to app because it's being desctructed: {}", msg.type().name());
+    });
+    amq->makeThisGlobalAppQueue(true);
+    app.reset();
+    ui.reset();
+    amq->makeThisGlobalAppQueue(false);
 
     return 0;
 }

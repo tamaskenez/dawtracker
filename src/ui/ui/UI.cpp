@@ -72,6 +72,14 @@ struct UIImpl : public UI {
             sendToApp(MAKE_VARIANT_V(msg::Metronome, BPM{bpm}));
         }
 
+        if (!uiState.inputs.empty()) {
+            ImGui::TextUnformatted("Inputs:");
+            for (auto& i : uiState.inputs) {
+                if (ImGui::Checkbox(i.name.c_str(), &i.enabled)) {
+                    sendToApp(msg::InputChanged{i.name, i.enabled});
+                }
+            }
+        }
         if (!uiState.recordButton) {
             ImGui::BeginDisabled();
         }

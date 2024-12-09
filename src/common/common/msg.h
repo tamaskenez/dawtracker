@@ -47,4 +47,9 @@ enum class Transport {
     stop,
     play
 };
+
+struct InputChanged {
+    string name;
+    bool enabled;
+};
 } // namespace msg
