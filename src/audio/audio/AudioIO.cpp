@@ -99,7 +99,6 @@ struct AudioIOImpl
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
     AudioIODeviceCallback deviceCallback;
     juce::AudioDeviceManager deviceManager;
-
     AudioIOImpl()
     {
         deviceManager.addChangeListener(this);
@@ -161,45 +160,40 @@ struct AudioIOImpl
             if (result.isNotEmpty()) {
                 return unexpected(result.toStdString());
             }
+            ads = deviceManager.getAudioDeviceSetup();
+            if ((ads.outputDeviceName.isEmpty() || ads.outputChannels.isZero())
+                && (ads.inputDeviceName.isEmpty() || ads.inputChannels.isZero())) {
+                deviceManager.closeAudioDevice();
+            }
         }
         return getAudioSettings();
     }
     AudioSettings getAudioSettings() override
     {
-        auto* cad = deviceManager.getCurrentAudioDevice();
-        if (!cad) {
-            return AudioSettings{};
-        }
         auto ads = deviceManager.getAudioDeviceSetup();
-        bool hasActiveChannels = (ads.outputDeviceName.isNotEmpty() && !ads.outputChannels.isZero())
-                              || (ads.inputDeviceName.isNotEmpty() && !ads.inputChannels.isZero());
+        juce::StringArray outputChannelNames, inputChannelNames;
+        {
+            auto d = unique_ptr<juce::AudioIODevice>(
+              deviceManager.getCurrentDeviceTypeObject()->createDevice(ads.outputDeviceName, ads.inputDeviceName)
+            );
+            outputChannelNames = d->getOutputChannelNames();
+            inputChannelNames = d->getInputChannelNames();
+        }
         LOG(INFO) << fmt::format(
-          "getAudioSettings ({}Hz/{}) in: {} {}, out {} {}",
-          cad->getCurrentSampleRate(),
-          cad->getCurrentBufferSizeSamples(),
+          "getAudioSettings ({}Hz/{}) out: {} {}, in: {} {}",
+          ads.sampleRate,
+          ads.bufferSize,
           ads.outputDeviceName.toStdString(),
-          toString(cad->getOutputChannelNames(), cad->getActiveOutputChannels()),
+          toString(outputChannelNames, ads.outputChannels),
           ads.inputDeviceName.toStdString(),
-          toString(cad->getInputChannelNames(), cad->getActiveInputChannels())
+          toString(inputChannelNames, ads.inputChannels)
         );
 
-        assert(ads.outputChannels == cad->getActiveOutputChannels());
-        if (ads.inputChannels != cad->getActiveInputChannels()) {
-            UNUSED auto i1 = ads.inputChannels.toInteger();
-            UNUSED auto i2 = cad->getActiveInputChannels().toInteger();
-            assert(false);
-        }
-        if (hasActiveChannels) {
-            assert(ads.sampleRate == cad->getCurrentSampleRate());
-            assert(ads.bufferSize == cad->getCurrentBufferSizeSamples());
-        }
         return AudioSettings{
-          .outputDevice =
-            toAudioSettingsDevice(ads.outputDeviceName, cad->getOutputChannelNames(), cad->getActiveOutputChannels()),
-          .inputDevice =
-            toAudioSettingsDevice(ads.inputDeviceName, cad->getInputChannelNames(), cad->getActiveInputChannels()),
-          .bufferSize = cad->getCurrentBufferSizeSamples(),
-          .sampleRate = cad->getCurrentSampleRate()
+          .outputDevice = toAudioSettingsDevice(ads.outputDeviceName, outputChannelNames, ads.outputChannels),
+          .inputDevice = toAudioSettingsDevice(ads.inputDeviceName, inputChannelNames, ads.inputChannels),
+          .bufferSize = ads.bufferSize,
+          .sampleRate = ads.sampleRate
         };
     }
     void setAudioCallback(AudioCallbackFn callbackFn) override
@@ -210,9 +204,15 @@ struct AudioIOImpl
     expected<void, string> enableInput(string_view name, bool enabled) override
     {
         LOG(INFO) << fmt::format("enableInput(\"{}\", {})", name, enabled);
-        auto* cad = deviceManager.getCurrentAudioDevice();
-        CHECK_OR_RETURN_VAL(cad, unexpected("[internal error] There's no current audio device."));
-        auto icn = cad->getInputChannelNames();
+        auto ads = deviceManager.getAudioDeviceSetup();
+        CHECK(ads.inputDeviceName.isNotEmpty());
+        juce::StringArray icn;
+        {
+            auto id = unique_ptr<juce::AudioIODevice>(
+              deviceManager.getCurrentDeviceTypeObject()->createDevice({}, ads.inputDeviceName)
+            );
+            icn = id->getInputChannelNames();
+        }
         optional<int> requestedChix;
         for (int chix : vi::iota(0, icn.size())) {
             if (icn[chix].toStdString() == name) {
@@ -220,7 +220,6 @@ struct AudioIOImpl
                 break;
             }
         }
-        auto ads = deviceManager.getAudioDeviceSetup();
         CHECK_OR_RETURN_VAL(
           requestedChix,
           unexpected(fmt::format(
@@ -230,13 +229,17 @@ struct AudioIOImpl
           ))
         );
 
-        assert(cad->getActiveInputChannels() == ads.inputChannels);
         ads.inputChannels.setBit(*requestedChix, enabled);
         ads.useDefaultInputChannels = false;
         ads.useDefaultOutputChannels = false;
         auto result = deviceManager.setAudioDeviceSetup(ads, true);
         if (result.isNotEmpty()) {
             return unexpected(result.toStdString());
+        }
+        ads = deviceManager.getAudioDeviceSetup();
+        if ((ads.outputDeviceName.isEmpty() || ads.outputChannels.isZero())
+            && (ads.inputDeviceName.isEmpty() || ads.inputChannels.isZero())) {
+            deviceManager.closeAudioDevice();
         }
         return {};
     }

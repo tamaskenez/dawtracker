@@ -34,7 +34,13 @@ struct AudioEngineImpl : public AudioEngine {
     std::atomic_bool recording;
     void audioCallbacksAboutToStart(double sampleRateArg, size_t bufferSizeArg, size_t numInputChannels) override
     {
-        LOG(INFO) << fmt::format("audioCallbacksAboutToStart thread: {}", this_thread::get_id());
+        LOG(INFO) << fmt::format(
+          "audioCallbacksAboutToStart thread: {}, {}Hz/{}, ins: {}",
+          this_thread::get_id(),
+          sampleRateArg,
+          bufferSizeArg,
+          numInputChannels
+        );
         sampleRate = sampleRateArg;
         bufferSize = bufferSizeArg;
         metronome.timeSinceLastStart = 0;
