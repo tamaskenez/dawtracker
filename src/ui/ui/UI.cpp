@@ -96,10 +96,8 @@ struct UIImpl : public UI {
             sendToApp(msg::Transport::record);
         }
         if (uiState.clipBeingRecordedSeconds) {
-            if (uiState.clipBeingRecordedSeconds) {
-                ImGui::SameLine();
-                ImGui::TextUnformatted(fmt::format("Recording {} seconds", *uiState.clipBeingRecordedSeconds).c_str());
-            }
+            ImGui::SameLine();
+            ImGui::TextUnformatted(fmt::format("Recording {:.1f} seconds", *uiState.clipBeingRecordedSeconds).c_str());
         }
         if (!uiState.recordButtonEnabled) {
             ImGui::EndDisabled();
@@ -123,6 +121,14 @@ struct UIImpl : public UI {
         }
         if (!uiState.playButtonEnabled) {
             ImGui::EndDisabled();
+        }
+
+        for (size_t i : vi::iota(0u, uiState.clips.size())) {
+            ImGui::TextUnformatted(fmt::format("Clip #{}", i).c_str());
+            ImGui::SameLine(150.0f);
+            if (ImGui::Button(fmt::format("Play##{}", i).c_str())) {
+                sendToApp(msg::PlayClip{i});
+            }
         }
 
         ImGui::End();

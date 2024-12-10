@@ -35,4 +35,8 @@ struct UIState {
     vector<Output> outputs;
 
     optional<double> clipBeingRecordedSeconds;
+
+    struct Clip {
+    };
+    vector<Clip> clips;
 };

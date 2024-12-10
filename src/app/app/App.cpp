@@ -76,6 +76,7 @@ struct AppImpl
         uiState->recordButton = clipBeingRecorded.has_value();
         uiState->stopButtonEnabled = clipBeingPlayed || clipBeingRecorded.has_value();
         uiState->stopButton = clipBeingPlayed || clipBeingRecorded.has_value();
+        uiState->clips.resize(clips.size());
     }
 
     void audioEngineUpdateMetronome()
@@ -169,7 +170,7 @@ struct AppImpl
         audioEngine->stopRecording();
         clips.push_back(MOVE(*clipBeingRecorded));
         clipBeingRecorded.reset();
-        uiState->clipBeingRecordedSeconds = 0;
+        uiState->clipBeingRecordedSeconds.reset();
         // todo recalculate a few things
         updateUIStateDerivedFields();
         sendRefreshUIEventToAppMain();

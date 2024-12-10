@@ -59,6 +59,9 @@ struct OutputChanged {
     string name;
     bool enabled;
 };
+struct PlayClip {
+    size_t i;
+};
 
 namespace AudioEngine
 {
