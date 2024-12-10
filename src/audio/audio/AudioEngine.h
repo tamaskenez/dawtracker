@@ -21,6 +21,7 @@ public:
     virtual void sendStateChangerFn(StateChangerFn fn) = 0;
 
     virtual void record() = 0;
+    virtual void stopRecording() = 0;
 
     virtual void audioCallbacksAboutToStart(double sampleRate, size_t bufferSize, size_t numInputChannels) = 0;
     virtual void audioCallbacksStopped() = 0;

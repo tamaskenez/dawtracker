@@ -17,6 +17,6 @@ public:
     initialize(optional<string> outputDeviceName, optional<string> inputDeviceName) = 0;
     virtual AudioSettings getAudioSettings() = 0;
     virtual void setAudioCallback(AudioCallbackFn callbackFn) = 0;
-    virtual expected<void, string> enableInput(string_view name, bool enabled) = 0;
+    virtual expected<void, string> enableInputOrOutput(InputOrOutput ioo, string_view name, bool enabled) = 0;
     virtual void runDispatchLoopUntil(chr::milliseconds d) = 0;
 };

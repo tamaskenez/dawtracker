@@ -120,6 +120,11 @@ struct AudioEngineImpl : public AudioEngine {
     {
         recording = true;
     }
+
+    void stopRecording() override
+    {
+        recording = false;
+    }
 };
 
 unique_ptr<AudioEngine> AudioEngine::make()

@@ -27,5 +27,12 @@ struct UIState {
         string name;
         bool enabled;
     };
+    struct Output {
+        string name;
+        bool enabled;
+    };
     vector<Input> inputs;
+    vector<Output> outputs;
+
+    optional<double> clipBeingRecordedSeconds;
 };

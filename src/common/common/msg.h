@@ -55,6 +55,10 @@ struct InputChanged {
     string name;
     bool enabled;
 };
+struct OutputChanged {
+    string name;
+    bool enabled;
+};
 
 namespace AudioEngine
 {

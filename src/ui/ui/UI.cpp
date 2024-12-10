@@ -72,6 +72,15 @@ struct UIImpl : public UI {
             sendToApp(MAKE_VARIANT_V(msg::Metronome, BPM{bpm}));
         }
 
+        if (!uiState.outputs.empty()) {
+            ImGui::TextUnformatted("Outputs:");
+            for (auto& i : uiState.outputs) {
+                if (ImGui::Checkbox(i.name.c_str(), &i.enabled)) {
+                    sendToApp(msg::OutputChanged{i.name, i.enabled});
+                }
+            }
+        }
+
         if (!uiState.inputs.empty()) {
             ImGui::TextUnformatted("Inputs:");
             for (auto& i : uiState.inputs) {
@@ -85,6 +94,12 @@ struct UIImpl : public UI {
         }
         if (ImGui::Checkbox("Record", &uiState.recordButton)) {
             sendToApp(msg::Transport::record);
+        }
+        if (uiState.clipBeingRecordedSeconds) {
+            if (uiState.clipBeingRecordedSeconds) {
+                ImGui::SameLine();
+                ImGui::TextUnformatted(fmt::format("Recording {} seconds", *uiState.clipBeingRecordedSeconds).c_str());
+            }
         }
         if (!uiState.recordButtonEnabled) {
             ImGui::EndDisabled();

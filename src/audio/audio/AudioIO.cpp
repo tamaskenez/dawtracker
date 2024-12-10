@@ -171,6 +171,9 @@ struct AudioIOImpl
     AudioSettings getAudioSettings() override
     {
         auto ads = deviceManager.getAudioDeviceSetup();
+        if (ads.outputDeviceName.isEmpty() && ads.inputDeviceName.isEmpty()) {
+            return AudioSettings{};
+        }
         juce::StringArray outputChannelNames, inputChannelNames;
         {
             auto d = unique_ptr<juce::AudioIODevice>(
@@ -201,17 +204,33 @@ struct AudioIOImpl
         juce::ScopedLock scopedLock(deviceManager.getAudioCallbackLock());
         deviceCallback.audioCallback = MOVE(callbackFn);
     }
-    expected<void, string> enableInput(string_view name, bool enabled) override
+    expected<void, string> enableInputOrOutput(InputOrOutput ioo, string_view name, bool enabled) override
     {
         LOG(INFO) << fmt::format("enableInput(\"{}\", {})", name, enabled);
         auto ads = deviceManager.getAudioDeviceSetup();
-        CHECK(ads.inputDeviceName.isNotEmpty());
         juce::StringArray icn;
-        {
-            auto id = unique_ptr<juce::AudioIODevice>(
-              deviceManager.getCurrentDeviceTypeObject()->createDevice({}, ads.inputDeviceName)
-            );
-            icn = id->getInputChannelNames();
+        string label, Label, deviceName;
+        switch (ioo) {
+        case in:
+            CHECK(ads.inputDeviceName.isNotEmpty());
+            icn = unique_ptr<juce::AudioIODevice>(
+                    deviceManager.getCurrentDeviceTypeObject()->createDevice({}, ads.inputDeviceName)
+            )
+                    ->getInputChannelNames();
+            label = "input";
+            Label = "Input";
+            deviceName = ads.inputDeviceName.toStdString();
+            break;
+        case out:
+            CHECK(ads.outputDeviceName.isNotEmpty());
+            icn = unique_ptr<juce::AudioIODevice>(
+                    deviceManager.getCurrentDeviceTypeObject()->createDevice(ads.outputDeviceName, {})
+            )
+                    ->getOutputChannelNames();
+            label = "output";
+            Label = "Output";
+            deviceName = ads.outputDeviceName.toStdString();
+            break;
         }
         optional<int> requestedChix;
         for (int chix : vi::iota(0, icn.size())) {
@@ -223,13 +242,22 @@ struct AudioIOImpl
         CHECK_OR_RETURN_VAL(
           requestedChix,
           unexpected(fmt::format(
-            "[internal error] Input channel name {} not found in the current input device ({})",
+            "[internal error] {} channel name {} not found in the current {} device ({})",
+            Label,
             name,
-            ads.inputDeviceName.toStdString()
+            label,
+            deviceName
           ))
         );
 
-        ads.inputChannels.setBit(*requestedChix, enabled);
+        switch (ioo) {
+        case in:
+            ads.inputChannels.setBit(*requestedChix, enabled);
+            break;
+        case out:
+            ads.outputChannels.setBit(*requestedChix, enabled);
+            break;
+        }
         ads.useDefaultInputChannels = false;
         ads.useDefaultOutputChannels = false;
         auto result = deviceManager.setAudioDeviceSetup(ads, true);
