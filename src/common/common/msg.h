@@ -70,6 +70,9 @@ struct NoFreeRecordingBuffer {
 struct RecordingBufferRecorded {
     RecordingBuffer* recordingBuffer;
 };
-using V = variant<NoFreeRecordingBuffer, RecordingBufferRecorded>;
+struct PlayedTime {
+    optional<double> t;
+};
+using V = variant<NoFreeRecordingBuffer, RecordingBufferRecorded, PlayedTime>;
 } // namespace AudioEngine
 } // namespace msg

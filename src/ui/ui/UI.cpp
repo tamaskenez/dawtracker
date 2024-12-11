@@ -119,6 +119,10 @@ struct UIImpl : public UI {
         if (ImGui::Checkbox("Play", &uiState.playButton)) {
             sendToApp(msg::Transport::play);
         }
+        if (uiState.playedTime) {
+            ImGui::SameLine();
+            ImGui::TextUnformatted(fmt::format("Playing {:.1f} seconds", *uiState.playedTime).c_str());
+        }
         if (!uiState.playButtonEnabled) {
             ImGui::EndDisabled();
         }

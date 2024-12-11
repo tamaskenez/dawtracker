@@ -22,6 +22,7 @@ struct AppCtx {
     // Volatile state of the app that can be reconstructed from essential or doesn't need to be reconstructed.
     unique_ptr<AudioIO> audioIO;
     optional<AudioClip> clipBeingRecorded;
+    bool clipBeingPlayed = false;
     vector<AudioClip> clips;
 
     explicit AppCtx(UI* uiArg);

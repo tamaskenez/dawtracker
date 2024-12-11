@@ -197,10 +197,19 @@ struct AppImpl
               uiState->clipBeingRecordedSeconds =
                 clipBeingRecorded->channels[0].size() / appState.audioSettings.sampleRate;
               sendRefreshUIEventToAppMain();
+          },
+          [this](const msg::AudioEngine::PlayedTime& x) {
+              uiState->playedTime = x.t;
+              sendRefreshUIEventToAppMain();
           }
         );
     }
-
+    void playClip(size_t i)
+    {
+        CHECK(i < clips.size());
+        clipBeingPlayed = true;
+        audioEngine->play(AudioClip(clips[i]));
+    }
     void receive(std::any&& msg) override
     {
         if (auto* a = std::any_cast<msg::MainMenu>(&msg)) {
@@ -229,6 +238,8 @@ struct AppImpl
             updateUIStateDerivedFields();
         } else if (auto* g = std::any_cast<msg::AudioEngine::V>(&msg)) {
             receiveAudioEngine(*g);
+        } else if (auto* i = std::any_cast<msg::PlayClip>(&msg)) {
+            playClip(i->i);
         } else {
             LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
         }

@@ -78,6 +78,27 @@ struct AudioEngineImpl : public AudioEngine {
                 elementWiseOperatorPlusEquals(span<float>(oc, numSamples), metronomeBuffer);
             }
         }
+        if (state.clipToPlay) {
+            auto& clip = *state.clipToPlay;
+            if (state.nextSampleToPlay < clip.size()) {
+                auto endSampleIx = std::min(numSamples, clip.size() - state.nextSampleToPlay);
+                for (size_t chix : vi::iota(0u, std::min(outputChannels.size(), clip.channels.size()))) {
+                    auto& sourceChannel = state.clipToPlay->channels[chix];
+                    auto& outputChannel = outputChannels[chix];
+                    for (size_t i = 0; i < endSampleIx; ++i) {
+                        outputChannel[i] += sourceChannel[state.nextSampleToPlay + i];
+                    }
+                }
+                state.nextSampleToPlay += endSampleIx;
+            }
+            if (clip.size() <= state.nextSampleToPlay) {
+                state.clipToPlay.reset();
+                state.nextSampleToPlay = 0;
+                sendToApp(MAKE_VARIANT_V(msg::AudioEngine, PlayedTime{}));
+            } else {
+                sendToApp(MAKE_VARIANT_V(msg::AudioEngine, PlayedTime{state.nextSampleToPlay / sampleRate}));
+            }
+        }
         if (recording) {
             RecordingBuffer* recordingBuffer{};
             for (auto& rb : recordingBuffers) {
@@ -124,6 +145,21 @@ struct AudioEngineImpl : public AudioEngine {
     void stopRecording() override
     {
         recording = false;
+    }
+
+    void play(AudioClip&& clipArg) override
+    {
+        mainToCallbackThreadQueue.enqueue([clip = MOVE(clipArg)](AudioEngineState& s) mutable {
+            s.clipToPlay = MOVE(clip);
+            s.nextSampleToPlay = 0;
+        });
+    }
+    void stopPlaying() override
+    {
+        mainToCallbackThreadQueue.enqueue([](AudioEngineState& s) mutable {
+            s.clipToPlay.reset();
+            s.nextSampleToPlay = 0;
+        });
     }
 };
 
