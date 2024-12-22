@@ -1,1 +1,2 @@
 add_subdirectory(audiodevicemanager)
+add_subdirectory(rse)

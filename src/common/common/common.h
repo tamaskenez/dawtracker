@@ -93,3 +93,19 @@ auto switch_variant(Variant&& variant, Ts&&... ts)
 {
     return std::visit(overloaded{std::forward<Ts>(ts)...}, std::forward<Variant>(variant));
 }
+
+template<class R, class T>
+R intCast(T t)
+{
+    static_assert(std::is_integral_v<R>, "The result type of intCast should be integer.");
+    static_assert(std::is_integral_v<T>, "Argument for intCast should be integer.");
+
+    // Return with static cast if static_cast is always safe, lossless.
+    if constexpr ((std::is_signed_v<R> == std::is_signed_v<T> && sizeof(R) >= sizeof(T))
+                  || (std::is_signed_v<R> && sizeof(R) > sizeof(T))) {
+        return static_cast<R>(t);
+    } else {
+        assert(std::in_range<R>(t));
+        return static_cast<R>(t);
+    }
+}

@@ -18,6 +18,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 
@@ -39,5 +40,6 @@ using std::string;
 using std::string_view;
 using std::unexpected;
 using std::unique_ptr;
+using std::unordered_map;
 using std::variant;
 using std::vector;
