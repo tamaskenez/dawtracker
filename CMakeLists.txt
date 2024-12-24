@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.29)
-project(dawtracker)
+project(DawTracker
+	VERSION 0.1
+)
 
 if(NOT CMAKE_PREFIX_PATH)
 	set(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/id)

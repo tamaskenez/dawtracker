@@ -226,7 +226,7 @@ struct AppImpl
             LOG(INFO) << "Record";
             CHECK(!rse.get(appState.clipBeingRecorded));
             auto& aad = rse.get(appState.activeAudioDevices);
-            CHECK(!aad.canRecord());
+            CHECK(aad.canRecord());
             rse.setAsDifferent(
               appState.clipBeingRecorded, AudioClip(aad.sampleRate, aad.inputDevice->activeChannels.size())
             );
