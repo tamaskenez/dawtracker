@@ -147,6 +147,9 @@ struct AppImpl
         case msg::MainMenu::settings:
             rse.set(appState.showAudioSettings, true);
             break;
+        case msg::MainMenu::hideSettings:
+            rse.set(appState.showAudioSettings, false);
+            break;
         }
     }
 
@@ -180,6 +183,19 @@ struct AppImpl
         }
         if (selectedInputDeviceIx > 0) {
             selectedInputDeviceName = asui.inputDeviceNames[selectedInputDeviceIx];
+        }
+        if (auto aad = audioIO->initialize(selectedOutputDeviceName, selectedInputDeviceName)) {
+            rse.set(appState.activeAudioDevices, MOVE(*aad));
+        } else {
+            rse.set(appState.activeAudioDevices, ActiveAudioDevices{});
+            assert(false);
+            // Platform::messageBoxError(as.error()); //TODO
+            LOG(ERROR) << fmt::format(
+              "Failed to initialize audio devices to output: \"{}\", input: \"{}\": {}",
+              selectedOutputDeviceName.value_or("None"),
+              selectedInputDeviceName.value_or("None"),
+              aad.error()
+            );
         }
     }
 
@@ -335,25 +351,6 @@ struct AppImpl
               audioEngine->audioCallbacksStopped();
           }
         );
-    }
-
-    void update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState(
-      const optional<string>& selectedOutputDeviceName, const optional<string>& selectedInputDeviceName
-    )
-    {
-        if (auto as = audioIO->initialize(selectedOutputDeviceName, selectedInputDeviceName)) {
-            rse.set(appState.activeAudioDevices, MOVE(*as));
-        } else {
-            rse.set(appState.activeAudioDevices, ActiveAudioDevices{});
-            assert(false);
-            // Platform::messageBoxError(as.error()); //TODO
-            LOG(ERROR) << fmt::format(
-              "Failed to initialize audio devices to output: \"{}\", input: \"{}\": {}",
-              selectedOutputDeviceName.value_or("None"),
-              selectedInputDeviceName.value_or("None"),
-              as.error()
-            );
-        }
     }
 };
 

@@ -165,6 +165,7 @@ private:
         auto offset = getOffset(k);
         auto& v = variables[offset];
         assert(!v.updateFn);
+        v.timestamp = 0;
         v.updateFn = [this, &k, updateFn = MOVE(updaterFnArg), offset]() {
             variableBeingUpdatedStack.push_back(offset);
             set(k, updateFn());
@@ -191,7 +192,7 @@ private:
 
     struct Variable {
         uint64_t maxUpstreamTimestamp = 0;
-        uint64_t timestamp = 0;
+        uint64_t timestamp = 1;
         // Dependents are other variables that should be updated when this is changing.
         vector<intptr_t> dependents;
         function<void()> updateFn;

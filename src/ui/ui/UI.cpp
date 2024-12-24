@@ -1,5 +1,7 @@
 #include "UI.h"
 
+#include "common/AppState.h"
+#include "common/ReactiveStateEngine.h"
 #include "common/msg.h"
 #include "platform/AppMsgQueue.h"
 
@@ -69,71 +71,79 @@ struct UIImpl : public UI {
         }
         ImGui::Checkbox("Demo Window",
                         &show_demo_window); // Edit bools storing our window open/close state
-        bool on = uiState.metronome.on;
+        bool on = rse.get(appState.metronome.on);
         if (ImGui::Checkbox("Metronome", &on)) {
             sendToApp(MAKE_VARIANT_V(msg::Metronome, On{on}));
         }
-        float bpm = uiState.metronome.bpm;
+        float bpm = rse.get(appState.metronome.bpm);
         if (ImGui::SliderFloat("BPM", &bpm, 32, 320, "%.1f", ImGuiSliderFlags_AlwaysClamp)) {
             sendToApp(MAKE_VARIANT_V(msg::Metronome, BPM{bpm}));
         }
 
-        if (!uiState.outputs.empty()) {
+        auto outputs = rse.get(appState.outputs);
+        if (!outputs.empty()) {
             ImGui::TextUnformatted("Outputs:");
-            for (auto& i : uiState.outputs) {
+            for (auto& i : outputs) {
                 if (ImGui::Checkbox(i.name.c_str(), &i.enabled)) {
                     sendToApp(msg::OutputChanged{i.name, i.enabled});
                 }
             }
         }
 
-        if (!uiState.inputs.empty()) {
+        auto inputs = rse.get(appState.inputs);
+        if (!inputs.empty()) {
             ImGui::TextUnformatted("Inputs:");
-            for (auto& i : uiState.inputs) {
+            for (auto& i : inputs) {
                 if (ImGui::Checkbox(i.name.c_str(), &i.enabled)) {
                     sendToApp(msg::InputChanged{i.name, i.enabled});
                 }
             }
         }
-        if (!uiState.recordButtonEnabled) {
+        if (!rse.get(appState.recordButtonEnabled)) {
             ImGui::BeginDisabled();
         }
-        if (ImGui::Checkbox("Record", &uiState.recordButton)) {
+        auto recordButton = rse.get(appState.recordButton);
+        if (ImGui::Checkbox("Record", &recordButton)) {
             sendToApp(msg::Transport::record);
         }
-        if (uiState.clipBeingRecordedSeconds) {
+        auto clipBeingRecordedSeconds = rse.get(appState.clipBeingRecordedSeconds);
+        if (clipBeingRecordedSeconds) {
             ImGui::SameLine();
-            ImGui::TextUnformatted(fmt::format("Recording {:.1f} seconds", *uiState.clipBeingRecordedSeconds).c_str());
+            ImGui::TextUnformatted(fmt::format("Recording {:.1f} seconds", *clipBeingRecordedSeconds).c_str());
         }
-        if (!uiState.recordButtonEnabled) {
+        if (!rse.get(appState.recordButtonEnabled)) {
             ImGui::EndDisabled();
         }
 
-        if (!uiState.stopButtonEnabled) {
+        if (!rse.get(appState.stopButtonEnabled)) {
             ImGui::BeginDisabled();
         }
-        if (ImGui::Checkbox("Stop", &uiState.stopButton)) {
+        auto stopButton = rse.get(appState.stopButton);
+        if (ImGui::Checkbox("Stop", &stopButton)) {
             sendToApp(msg::Transport::stop);
         }
-        if (!uiState.stopButtonEnabled) {
+        if (!rse.get(appState.stopButtonEnabled)) {
             ImGui::EndDisabled();
         }
 
-        if (!uiState.playButtonEnabled) {
+        if (!rse.get(appState.playButtonEnabled)) {
             ImGui::BeginDisabled();
         }
-        if (ImGui::Checkbox("Play", &uiState.playButton)) {
+        auto playButton = rse.get(appState.playButton);
+        if (ImGui::Checkbox("Play", &playButton)) {
             sendToApp(msg::Transport::play);
         }
-        if (uiState.playedTime) {
+        auto playedTime = rse.get(appState.playedTime);
+        if (playedTime) {
             ImGui::SameLine();
-            ImGui::TextUnformatted(fmt::format("Playing {:.1f} seconds", *uiState.playedTime).c_str());
+            ImGui::TextUnformatted(fmt::format("Playing {:.1f} seconds", *playedTime).c_str());
         }
-        if (!uiState.playButtonEnabled) {
+        if (!rse.get(appState.playButtonEnabled)) {
             ImGui::EndDisabled();
         }
 
-        for (size_t i : vi::iota(0u, uiState.clips.size())) {
+        auto& clips = rse.get(appState.clips);
+        for (size_t i : vi::iota(0u, clips.size())) {
             ImGui::TextUnformatted(fmt::format("Clip #{}", i).c_str());
             ImGui::SameLine(150.0f);
             if (ImGui::Button(fmt::format("Play##{}", i).c_str())) {
@@ -143,13 +153,17 @@ struct UIImpl : public UI {
 
         ImGui::End();
 
-        if (uiState.showAudioSettings) {
+        bool showAudioSettings = rse.get(appState.showAudioSettings);
+        if (showAudioSettings) {
             ImGui::Begin(
               "Settings",
-              &uiState.showAudioSettings,
+              &showAudioSettings,
               ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings
             );
-            auto& p = uiState.audioSettings;
+            if (!showAudioSettings) {
+                sendToApp(msg::MainMenu::hideSettings);
+            }
+            auto& p = rse.get(appState.audioSettingsUI);
             if (ImGui::BeginCombo("Output Device", p.selectedOutputDeviceName().c_str())) {
                 for (size_t i : vi::iota(0u, p.outputDeviceNames.size())) {
                     if (ImGui::Selectable(p.outputDeviceNames[i].c_str(), i == p.selectedOutputDeviceIx)) {

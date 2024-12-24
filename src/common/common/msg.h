@@ -6,7 +6,8 @@ namespace msg
 {
 enum class MainMenu {
     quit,
-    settings
+    settings,
+    hideSettings
 };
 
 namespace AudioSettings
@@ -62,7 +63,6 @@ struct OutputChanged {
 struct PlayClip {
     size_t i;
 };
-
 namespace AudioEngine
 {
 struct NoFreeRecordingBuffer {
