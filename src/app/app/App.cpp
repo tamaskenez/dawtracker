@@ -1,15 +1,18 @@
 #include "App.h"
 
 #include "AppCtx.h"
+
 #include "audio/AudioIO.h"
+#include "common/AppState.h"
 #include "common/MetronomeGenerator.h"
+#include "common/ReactiveStateEngine.h"
 #include "common/msg.h"
 #include "platform/platform.h"
 #include "ui/UI.h"
 
 namespace
 {
-UIState::AudioSettings refreshSettingsUIState(const vector<AudioDevice>& ads, const AudioSettings& as)
+AppState::AudioSettingsUI makeAudioSettingsUI(const vector<AudioDeviceProperties>& ads, const ActiveAudioDevices& as)
 {
     vector<string> ods, ids;
     ods.push_back("None");
@@ -42,7 +45,7 @@ UIState::AudioSettings refreshSettingsUIState(const vector<AudioDevice>& ads, co
         }
     }
 
-    return UIState::AudioSettings{
+    return AppState::AudioSettingsUI{
       .outputDeviceNames = MOVE(ods),
       .inputDeviceNames = MOVE(ids),
       .selectedOutputDeviceIx = sod,
@@ -54,8 +57,8 @@ UIState::AudioSettings refreshSettingsUIState(const vector<AudioDevice>& ads, co
 struct AppImpl
     : public App
     , public AppCtx {
-    explicit AppImpl(UI* uiArg)
-        : AppCtx(uiArg)
+    AppImpl(UI* uiArg, AppState& appStateArg, ReactiveStateEngine& rseArg)
+        : AppCtx(uiArg, appStateArg, rseArg)
     {
         println("main thread: {}", this_thread::get_id());
         audioIO->setAudioCallback([audioEngine_ = audioEngine.get()](
@@ -63,27 +66,75 @@ struct AppImpl
                                   ) {
             audioEngine_->process(inputChannels, outputChannels, numSamples);
         });
-        audioEngineUpdateMetronome();
-    }
 
-    void updateUIStateDerivedFields()
-    {
-        bool clipBeingPlayed = false; // todo
-        uiState->playButtonEnabled = appState.audioSettings.outputDevice.has_value() && !clips.empty()
-                                  && !clipBeingRecorded; // Todo we'll have a list of clips.
-        uiState->playButton = clipBeingPlayed;
-        uiState->recordButtonEnabled = appState.audioSettings.canRecord() && !clipBeingRecorded && !clipBeingPlayed;
-        uiState->recordButton = clipBeingRecorded.has_value();
-        uiState->stopButtonEnabled = clipBeingPlayed || clipBeingRecorded.has_value();
-        uiState->stopButton = clipBeingPlayed || clipBeingRecorded.has_value();
-        uiState->clips.resize(clips.size());
-    }
+        rse.registerUpdater(appState.audioSettingsUI, [this]() {
+            return makeAudioSettingsUI(audioIO->getAudioDevices(), rse.get(appState.activeAudioDevices));
+        });
+        rse.registerUpdater(appState.playButtonEnabled, [this]() {
+            return rse.get(appState.activeAudioDevices.outputDevice).has_value() && !rse.get(appState.clips).empty()
+                && !rse.get(appState.clipBeingRecorded);
+        });
+        rse.registerUpdater(appState.playButton, [this]() {
+            return rse.get(appState.clipBeingPlayed);
+        });
 
-    void audioEngineUpdateMetronome()
-    {
-        audioEngine->sendStateChangerFn([this](AudioEngineState& s) {
-            s.metronome.on = uiState->metronome.on;
-            s.metronome.bpm = uiState->metronome.bpm;
+        rse.registerUpdater(appState.recordButtonEnabled, [this]() {
+            return rse.get(appState.activeAudioDevices).canRecord() && !rse.get(appState.clipBeingRecorded)
+                && !rse.get(appState.clipBeingPlayed);
+        });
+        rse.registerUpdater(appState.recordButton, [this]() {
+            return rse.get(appState.clipBeingRecorded).has_value();
+        });
+        rse.registerUpdater(appState.stopButtonEnabled, [this]() {
+            return rse.get(appState.clipBeingPlayed) || rse.get(appState.clipBeingRecorded).has_value();
+        });
+        rse.registerUpdater(appState.stopButton, [this]() {
+            return rse.get(appState.clipBeingPlayed) || rse.get(appState.clipBeingRecorded).has_value();
+        });
+        rse.registerUpdater(appState.anyVariableDisplayedOnUIChanged, [this]() {
+            rse.get(appState.audioSettingsUI);
+            rse.get(appState.showAudioSettings);
+            rse.get(appState.metronome);
+            rse.get(appState.recordButtonEnabled);
+            rse.get(appState.stopButtonEnabled);
+            rse.get(appState.playButtonEnabled);
+            rse.get(appState.recordButton);
+            rse.get(appState.stopButton);
+            rse.get(appState.playButton);
+            rse.get(appState.inputs);
+            rse.get(appState.outputs);
+            rse.get(appState.clips);
+            return true;
+        });
+        rse.registerUpdater(appState.metronomeChanged, [this]() {
+            rse.get(appState.metronome);
+            return true;
+        });
+        rse.registerUpdater(appState.inputs, [this]() {
+            vector<AudioChannelPropertiesOnUI> inputs;
+            if (auto id = rse.get(appState.activeAudioDevices).inputDevice) {
+                inputs.reserve(id->channelNames.size());
+                for (auto& n : id->channelNames) {
+                    inputs.push_back(AudioChannelPropertiesOnUI{.name = n, .enabled = false});
+                }
+                for (auto i : id->activeChannels) {
+                    inputs.at(i).enabled = true;
+                }
+            }
+            return inputs;
+        });
+        rse.registerUpdater(appState.outputs, [this]() {
+            vector<AudioChannelPropertiesOnUI> outputs;
+            if (auto id = rse.get(appState.activeAudioDevices).outputDevice) {
+                outputs.reserve(id->channelNames.size());
+                for (auto& n : id->channelNames) {
+                    outputs.push_back(AudioChannelPropertiesOnUI{.name = n, .enabled = false});
+                }
+                for (auto i : id->activeChannels) {
+                    outputs.at(i).enabled = true;
+                }
+            }
+            return outputs;
         });
     }
 
@@ -94,42 +145,57 @@ struct AppImpl
             sendQuitEventToAppMain();
             break;
         case msg::MainMenu::settings:
-            uiState->audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
-            uiState->showAudioSettings = true;
-            sendRefreshUIEventToAppMain();
+            rse.set(appState.showAudioSettings, true);
             break;
         }
     }
 
     void receiveAudioSettings(const msg::AudioSettings::V& as)
     {
+        auto& asui = rse.get(appState.audioSettingsUI);
+        size_t selectedOutputDeviceIx = asui.selectedOutputDeviceIx, selectedInputDeviceIx = asui.selectedInputDeviceIx;
         switch_variant(
           as,
-          [this](const msg::AudioSettings::OutputDeviceSelected& x) {
-              uiState->audioSettings.selectedOutputDeviceIx = x.i;
-              update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState();
+          [&](const msg::AudioSettings::OutputDeviceSelected& x) {
+              selectedOutputDeviceIx = x.i;
           },
-          [this](const msg::AudioSettings::InputDeviceSelected& x) {
-              uiState->audioSettings.selectedInputDeviceIx = x.i;
-              update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState();
+          [&](const msg::AudioSettings::InputDeviceSelected& x) {
+              selectedInputDeviceIx = x.i;
           }
         );
-        updateUIStateDerivedFields();
+
+        bool validIx = isValidIndexOfContainer(selectedOutputDeviceIx, asui.outputDeviceNames);
+        LOG_IF(DFATAL, !validIx) << "Invalid selectedOutputDeviceIx";
+        if (!validIx) {
+            selectedOutputDeviceIx = 0;
+        }
+        validIx = isValidIndexOfContainer(selectedInputDeviceIx, asui.inputDeviceNames);
+        LOG_IF(DFATAL, !validIx) << "Invalid selectedInputDeviceIx";
+        if (!validIx) {
+            selectedInputDeviceIx = 0;
+        }
+        optional<string> selectedOutputDeviceName, selectedInputDeviceName;
+        if (selectedOutputDeviceIx > 0) {
+            selectedOutputDeviceName = asui.outputDeviceNames[selectedOutputDeviceIx];
+        }
+        if (selectedInputDeviceIx > 0) {
+            selectedInputDeviceName = asui.inputDeviceNames[selectedInputDeviceIx];
+        }
     }
 
     void receiveMetronome(const msg::Metronome::V& m)
     {
+        auto metronome = rse.get(appState.metronome);
         switch_variant(
           m,
-          [this](const msg::Metronome::On& x) {
-              uiState->metronome.on = x.b;
+          [&](const msg::Metronome::On& x) {
+              metronome.on = x.b;
           },
-          [this](const msg::Metronome::BPM& x) {
-              uiState->metronome.bpm = x.bpm;
+          [&](const msg::Metronome::BPM& x) {
+              metronome.bpm = x.bpm;
           }
         );
-        audioEngineUpdateMetronome();
-        sendRefreshUIEventToAppMain();
+        rse.set(appState.metronome, MOVE(metronome));
     }
 
     void runAudioIODispatchLoop() override
@@ -140,20 +206,22 @@ struct AppImpl
     void receiveTransport(msg::Transport t)
     {
         switch (t) {
-        case msg::Transport::record:
+        case msg::Transport::record: {
             LOG(INFO) << "Record";
-            CHECK(!clipBeingRecorded);
-            CHECK(appState.audioSettings.canRecord());
-            clipBeingRecorded =
-              AudioClip(appState.audioSettings.sampleRate, appState.audioSettings.inputDevice->activeChannels.size());
-            uiState->clipBeingRecordedSeconds = 0;
+            CHECK(!rse.get(appState.clipBeingRecorded));
+            auto& aad = rse.get(appState.activeAudioDevices);
+            CHECK(!aad.canRecord());
+            rse.setAsDifferent(
+              appState.clipBeingRecorded, AudioClip(aad.sampleRate, aad.inputDevice->activeChannels.size())
+            );
+            rse.set(appState.clipBeingRecordedSeconds, 0);
             audioEngine->record();
-            break;
+        } break;
         case msg::Transport::stop: {
             LOG(INFO) << "Stop";
-            bool clipBeingPlayed = false;
-            CHECK(clipBeingPlayed || clipBeingRecorded.has_value());
-            if (clipBeingRecorded) {
+            CHECK(rse.get(appState.clipBeingPlayed) || rse.get(appState.clipBeingRecorded).has_value());
+            rse.set(appState.clipBeingPlayed, false);
+            if (rse.get(appState.clipBeingRecorded)) {
                 stopRecording();
             }
         } break;
@@ -161,19 +229,16 @@ struct AppImpl
             LOG(INFO) << "Play";
             break;
         }
-        updateUIStateDerivedFields();
     }
 
     void stopRecording()
     {
-        CHECK(clipBeingRecorded);
+        auto clipBeingRecordedBorrow = rse.borrowThenSet(appState.clipBeingRecorded);
+        CHECK(clipBeingRecordedBorrow->has_value());
         audioEngine->stopRecording();
-        clips.push_back(MOVE(*clipBeingRecorded));
-        clipBeingRecorded.reset();
-        uiState->clipBeingRecordedSeconds.reset();
-        // todo recalculate a few things
-        updateUIStateDerivedFields();
-        sendRefreshUIEventToAppMain();
+        rse.borrowThenSet(appState.clips)->push_back(MOVE(**clipBeingRecordedBorrow));
+        rse.set(appState.clipBeingRecorded, nullopt);
+        rse.set(appState.clipBeingRecordedSeconds, nullopt);
     }
 
     void receiveAudioEngine(const msg::AudioEngine::V& msg)
@@ -187,27 +252,30 @@ struct AppImpl
           },
           [this](const msg::AudioEngine::RecordingBufferRecorded& x) {
               // Add buffer to current clip.
-              if (!clipBeingRecorded) {
+              auto clipBeingRecordedBorrow = rse.borrowThenSet(appState.clipBeingRecorded);
+              if (!clipBeingRecordedBorrow->has_value()) {
                   LOG(INFO) << "RecordingBufferRecorded when not recording";
                   return;
               }
-              CHECK(clipBeingRecorded && !clipBeingRecorded->channels.empty());
-              clipBeingRecorded->append(*x.recordingBuffer);
+              CHECK(clipBeingRecordedBorrow->has_value() && !(*clipBeingRecordedBorrow)->channels.empty());
+              (*clipBeingRecordedBorrow)->append(*x.recordingBuffer);
               x.recordingBuffer->sentToApp = false;
-              uiState->clipBeingRecordedSeconds =
-                clipBeingRecorded->channels[0].size() / appState.audioSettings.sampleRate;
+              rse.set(
+                appState.clipBeingRecordedSeconds,
+                (*clipBeingRecordedBorrow)->channels[0].size() / rse.get(appState.activeAudioDevices).sampleRate
+              );
               sendRefreshUIEventToAppMain();
           },
           [this](const msg::AudioEngine::PlayedTime& x) {
-              uiState->playedTime = x.t;
-              sendRefreshUIEventToAppMain();
+              rse.set(appState.playedTime, x.t);
           }
         );
     }
     void playClip(size_t i)
     {
+        auto& clips = rse.get(appState.clips);
         CHECK(i < clips.size());
-        clipBeingPlayed = true;
+        rse.set(appState.clipBeingPlayed, true);
         audioEngine->play(AudioClip(clips[i]));
     }
     void receive(std::any&& msg) override
@@ -223,25 +291,33 @@ struct AppImpl
         } else if (auto* e = std::any_cast<msg::Transport>(&msg)) {
             receiveTransport(*e);
         } else if (auto* f = std::any_cast<msg::InputChanged>(&msg)) {
-            if (auto r = audioIO->enableInputOrOutput(InputOrOutput::in, f->name, f->enabled); !r) {
+            if (auto r = audioIO->enableInOrOut(InOrOut::in, f->name, f->enabled); !r) {
                 // TODO: messageBox(r)
                 LOG(ERROR) << fmt::format("Failed changing input {} to {}: {}", f->name, f->enabled, r.error());
             }
-            update_fromAudioIO_toAppState_toUIState();
-            updateUIStateDerivedFields();
+            rse.set(appState.activeAudioDevices, audioIO->getActiveAudioDevices());
         } else if (auto* h = std::any_cast<msg::OutputChanged>(&msg)) {
-            if (auto r = audioIO->enableInputOrOutput(InputOrOutput::out, h->name, h->enabled); !r) {
+            if (auto r = audioIO->enableInOrOut(InOrOut::out, h->name, h->enabled); !r) {
                 // TODO: messageBox(r)
                 LOG(ERROR) << fmt::format("Failed changing output {} to {}: {}", h->name, h->enabled, r.error());
             }
-            update_fromAudioIO_toAppState_toUIState();
-            updateUIStateDerivedFields();
+            rse.set(appState.activeAudioDevices, audioIO->getActiveAudioDevices());
         } else if (auto* g = std::any_cast<msg::AudioEngine::V>(&msg)) {
             receiveAudioEngine(*g);
         } else if (auto* i = std::any_cast<msg::PlayClip>(&msg)) {
             playClip(i->i);
         } else {
             LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
+        }
+
+        if (rse.updateIfNeeded(appState.metronomeChanged)) {
+            audioEngine->sendStateChangerFn([metronome = appState.metronome](AudioEngineState& s) {
+                s.metronome.on = metronome.on;
+                s.metronome.bpm = metronome.bpm;
+            });
+        }
+        if (rse.updateIfNeeded(appState.anyVariableDisplayedOnUIChanged)) {
+            sendRefreshUIEventToAppMain();
         }
     }
 
@@ -250,7 +326,7 @@ struct AppImpl
         switch_variant(
           msg,
           [this](const msg::AudioIO::Changed&) {
-              update_fromAudioIO_toAppState_toUIState();
+              rse.set(appState.activeAudioDevices, audioIO->getActiveAudioDevices());
           },
           [this](const msg::AudioIO::AudioCallbacksAboutToStart& x) {
               audioEngine->audioCallbacksAboutToStart(x.sampleRate, x.bufferSize, x.numInputChannels);
@@ -261,60 +337,14 @@ struct AppImpl
         );
     }
 
-    void update_uiStateInputsOutputs_from_appStateAudioSettings()
+    void update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState(
+      const optional<string>& selectedOutputDeviceName, const optional<string>& selectedInputDeviceName
+    )
     {
-        uiState->inputs.clear();
-        if (auto id = appState.audioSettings.inputDevice) {
-            uiState->inputs.reserve(id->channelNames.size());
-            for (auto& n : id->channelNames) {
-                uiState->inputs.push_back(UIState::Input{.name = n, .enabled = false});
-            }
-            for (auto i : id->activeChannels) {
-                uiState->inputs.at(i).enabled = true;
-            }
-        }
-        uiState->outputs.clear();
-        if (auto id = appState.audioSettings.outputDevice) {
-            uiState->outputs.reserve(id->channelNames.size());
-            for (auto& n : id->channelNames) {
-                uiState->outputs.push_back(UIState::Output{.name = n, .enabled = false});
-            }
-            for (auto i : id->activeChannels) {
-                uiState->outputs.at(i).enabled = true;
-            }
-        }
-    }
-    void update_fromAudioIO_toAppState_toUIState()
-    {
-        appState.audioSettings = audioIO->getAudioSettings();
-        uiState->audioSettings = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
-        update_uiStateInputsOutputs_from_appStateAudioSettings();
-        sendRefreshUIEventToAppMain();
-    }
-    void update_fromUiStateAudioSettings_toAudioIO_toAppState_toUIState()
-    {
-        auto& uas = uiState->audioSettings;
-        bool validIx = isValidIndexOfContainer(uas.selectedOutputDeviceIx, uas.outputDeviceNames);
-        LOG_IF(DFATAL, !validIx) << "Invalid selectedOutputDeviceIx";
-        if (!validIx) {
-            uas.selectedOutputDeviceIx = 0;
-        }
-        validIx = isValidIndexOfContainer(uas.selectedInputDeviceIx, uas.inputDeviceNames);
-        LOG_IF(DFATAL, !validIx) << "Invalid selectedInputDeviceIx";
-        if (!validIx) {
-            uas.selectedInputDeviceIx = 0;
-        }
-        optional<string> selectedOutputDeviceName, selectedInputDeviceName;
-        if (uas.selectedOutputDeviceIx > 0) {
-            selectedOutputDeviceName = uas.outputDeviceNames[uas.selectedOutputDeviceIx];
-        }
-        if (uas.selectedInputDeviceIx > 0) {
-            selectedInputDeviceName = uas.inputDeviceNames[uas.selectedInputDeviceIx];
-        }
         if (auto as = audioIO->initialize(selectedOutputDeviceName, selectedInputDeviceName)) {
-            appState.audioSettings = *as;
+            rse.set(appState.activeAudioDevices, MOVE(*as));
         } else {
-            appState.audioSettings = AudioSettings{};
+            rse.set(appState.activeAudioDevices, ActiveAudioDevices{});
             assert(false);
             // Platform::messageBoxError(as.error()); //TODO
             LOG(ERROR) << fmt::format(
@@ -324,13 +354,10 @@ struct AppImpl
               as.error()
             );
         }
-        uas = refreshSettingsUIState(audioIO->getAudioDevices(), appState.audioSettings);
-        update_uiStateInputsOutputs_from_appStateAudioSettings();
-        sendRefreshUIEventToAppMain();
     }
 };
 
-unique_ptr<App> App::make(UI* ui)
+unique_ptr<App> App::make(UI* ui, AppState& appState, ReactiveStateEngine& rse)
 {
-    return make_unique<AppImpl>(ui);
+    return make_unique<AppImpl>(ui, appState, rse);
 }

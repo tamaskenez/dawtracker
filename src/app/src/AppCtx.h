@@ -1,30 +1,25 @@
 #pragma once
 
-#include "AppState.h"
-
 #include "common/AudioClip.h"
 #include "common/audiodevicetypes.h"
-#include "ui/UIState.h"
 
 #include "audio/AudioEngine.h"
 
 class UI;
+struct AppState;
+class ReactiveStateEngine;
 
 // Core app state passed to dialogs.
 class AudioIO;
 struct AppCtx {
-    UI* ui;           // To control the UI.
-    UIState* uiState; // To provide data to the UI
+    UI* ui;
 
-    AppState appState; // Essential state of the app.
+    AppState& appState;
+    ReactiveStateEngine& rse;
 
     unique_ptr<AudioEngine> audioEngine;
-    // Volatile state of the app that can be reconstructed from essential or doesn't need to be reconstructed.
     unique_ptr<AudioIO> audioIO;
-    optional<AudioClip> clipBeingRecorded;
-    bool clipBeingPlayed = false;
-    vector<AudioClip> clips;
 
-    explicit AppCtx(UI* uiArg);
+    AppCtx(UI* uiArg, AppState& appState, ReactiveStateEngine& rse);
     ~AppCtx();
 };

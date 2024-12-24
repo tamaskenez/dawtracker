@@ -3,9 +3,10 @@
 #include "audio/AudioIO.h"
 #include "ui/UI.h"
 
-AppCtx::AppCtx(UI* uiArg)
+AppCtx::AppCtx(UI* uiArg, AppState& appStateArg, ReactiveStateEngine& rseArg)
     : ui(uiArg)
-    , uiState(ui->getUIState())
+    , appState(appStateArg)
+    , rse(rseArg)
     , audioEngine(AudioEngine::make())
     , audioIO(AudioIO::make())
 {

@@ -16,6 +16,8 @@ int main()
     rse.set(s.a, 1);
     rse.set(s.b, 2);
     fmt::println("c: {}", rse.get(s.c));
+    rse.set(s.a, 10);
+    fmt::println("c: {}", rse.get(s.c));
 
     return EXIT_SUCCESS;
 }

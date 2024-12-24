@@ -26,17 +26,56 @@
 class ReactiveStateEngine
 {
 public:
-    template<class T>
-    explicit ReactiveStateEngine(T* rootArg)
-        : root(reinterpret_cast<intptr_t>(rootArg))
-        , end(root + intCast<intptr_t>(sizeof(T)))
+    template<class K>
+    class BorrowedVariableToSet
     {
-    }
+    public:
+        explicit BorrowedVariableToSet(ReactiveStateEngine* thatArg, K* variableArg, intptr_t offsetArg)
+            : that(thatArg)
+            , variable(variableArg)
+            , offset(offsetArg)
+        {
+        }
+        BorrowedVariableToSet(const BorrowedVariableToSet&) = delete;
+        BorrowedVariableToSet(BorrowedVariableToSet&& y)
+            : that(y.that)
+            , variable(y.variable)
+            , offset(y.offset)
+        {
+            y.variable = nullptr;
+        }
+        ~BorrowedVariableToSet()
+        {
+            if (variable) {
+                that->markChangedPrivate(offset);
+            }
+        }
+        K& operator*() const
+        {
+            return *variable;
+        }
+        K* operator->() const
+        {
+            return variable;
+        }
+
+    private:
+        ReactiveStateEngine* that;
+        K* variable;
+        intptr_t offset;
+    };
 
     template<class T, class Fn>
     void registerUpdater(T& k, Fn&& updaterFnArg)
     {
         registerUpdaterCore(k, function<T()>(std::forward<Fn>(updaterFnArg)));
+    }
+
+    // Return true if it had to be updated (wasn't up-to-date).
+    template<class T>
+    bool updateIfNeeded(const T& k)
+    {
+        return updateIfNeededCore(getOffset(k));
     }
 
     // Query the value of k.
@@ -46,7 +85,55 @@ public:
     template<class T>
     const T& get(const T& k)
     {
-        auto koffset = getOffset(k);
+        updateIfNeededCore(getOffset(k));
+        return k;
+    }
+
+    // Assign new value to the variable, and
+    // - if this is the initial `set` for the variable, or
+    // - the new value is different from the current one
+    // then recursively mark dependencies as outdated.
+    template<class K, class V>
+    bool set(K& k, V&& newValue)
+    {
+        auto offset = getOffset(k);
+        auto& v = variables[offset];
+        if (v.timestamp > 0 && k == newValue) {
+            return false;
+        }
+        k = std::forward<V>(newValue);
+        v.timestamp = nextTimestamp++;
+        for (auto d : v.dependents) {
+            bumpThisAndDownstreamVariablesMaxUpstreamTimestamp(d, v.timestamp);
+        }
+        return true;
+    }
+
+    // Assign new value to the variable and recursively mark dependencies as outdated.
+    // Do not compare new value to the existing value, always assume that it has changed.
+    // `setAsDifferent` is a useful alternative to `set` if we don't want to call the equality operator for the type
+    // (because it doesn not exist or expensive).
+    template<class K, class V>
+    void setAsDifferent(K& k, V&& newValue)
+    {
+        auto offset = getOffset(k);
+        auto& v = variables[offset];
+        k = std::forward<V>(newValue);
+        v.timestamp = nextTimestamp++;
+        for (auto d : v.dependents) {
+            bumpThisAndDownstreamVariablesMaxUpstreamTimestamp(d, v.timestamp);
+        }
+    }
+
+    template<class K>
+    auto borrowThenSet(K& k)
+    {
+        return BorrowedVariableToSet<K>(this, &k, getOffset(k));
+    }
+
+private:
+    bool updateIfNeededCore(intptr_t koffset)
+    {
         auto& vk = variables[koffset];
 
         if (!variableBeingUpdatedStack.empty()) {
@@ -61,7 +148,7 @@ public:
         }
 
         if (vk.maxUpstreamTimestamp <= vk.timestamp && vk.timestamp > 0) {
-            return k;
+            return false;
         }
 
         // Getting the value of an uninitialized (timestamp==0) or stale (maxUpstreamTimestamp > timestamp) variable.
@@ -69,26 +156,9 @@ public:
         assert(vk.updateFn);
         vk.updateFn();
 
-        return k;
-    }
-
-    template<class K, class V>
-    bool set(K& k, V&& newValue)
-    {
-        auto offset = getOffset(k);
-        auto& v = variables[offset];
-        if (v.timestamp > 0 && k == newValue) {
-            return false;
-        }
-        k = MOVE(newValue);
-        v.timestamp = nextTimestamp++;
-        for (auto d : v.dependents) {
-            bumpThisAndDownstreamVariablesMaxUpstreamTimestamp(d, v.timestamp);
-        }
         return true;
     }
 
-private:
     template<class T>
     void registerUpdaterCore(T& k, function<T()> updaterFnArg)
     {
@@ -108,9 +178,15 @@ private:
     template<class K>
     intptr_t getOffset(const K& k) const
     {
-        auto p = reinterpret_cast<intptr_t>(&k);
-        assert(root <= p && p < end);
-        return p - root;
+        return reinterpret_cast<intptr_t>(&k);
+    }
+    void markChangedPrivate(intptr_t offset)
+    {
+        auto& v = variables[offset];
+        v.timestamp = nextTimestamp++;
+        for (auto d : v.dependents) {
+            bumpThisAndDownstreamVariablesMaxUpstreamTimestamp(d, v.timestamp);
+        }
     }
 
     struct Variable {
@@ -123,8 +199,6 @@ private:
         bool addDependent(intptr_t d);
     };
 
-    intptr_t root;
-    intptr_t end;
     uint64_t nextTimestamp = 1;
     unordered_map<intptr_t, Variable> variables;
     vector<intptr_t> variableBeingUpdatedStack;

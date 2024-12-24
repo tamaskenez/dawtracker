@@ -2,13 +2,13 @@
 
 #include "std.h"
 
-enum InputOrOutput {
+enum InOrOut {
     in,
     out
 };
 
-struct AudioDevice {
-    InputOrOutput ioo;
+struct AudioDeviceProperties {
+    InOrOut ioo;
     string name;
     string type;
     vector<string> channelNames;
@@ -17,11 +17,12 @@ struct AudioDevice {
     int defaultBufferSize;
 };
 
-struct AudioSettings {
+struct ActiveAudioDevices {
     struct Device {
         string name;
         vector<string> channelNames;
         vector<size_t> activeChannels;
+        bool operator==(const Device&) const = default;
     };
     optional<Device> outputDevice, inputDevice;
     int bufferSize = 0;
@@ -31,4 +32,5 @@ struct AudioSettings {
     {
         return inputDevice && !inputDevice->activeChannels.empty();
     }
+    bool operator==(const ActiveAudioDevices&) const = default;
 };

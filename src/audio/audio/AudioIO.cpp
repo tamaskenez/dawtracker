@@ -12,14 +12,14 @@ namespace
 {
 std::atomic_bool s_singleInstanceCreated;
 
-optional<AudioSettings::Device> toAudioSettingsDevice(
+optional<ActiveAudioDevices::Device> toAudioSettingsDevice(
   const juce::String& deviceName, const juce::StringArray& channelNames, const juce::BigInteger& activeChannels
 )
 {
     if (deviceName.isEmpty()) {
         return nullopt;
     }
-    return AudioSettings::Device{
+    return ActiveAudioDevices::Device{
       .name = deviceName.toStdString(),
       .channelNames = toVectorString(channelNames),
       .activeChannels = toVectorSizeT(activeChannels)
@@ -121,17 +121,17 @@ struct AudioIOImpl
         juce::MessageManager::getInstance()->runDispatchLoopUntil(int(d.count()));
     }
 
-    vector<AudioDevice> getAudioDevices() override
+    vector<AudioDeviceProperties> getAudioDevices() override
     {
-        vector<AudioDevice> devices;
+        vector<AudioDeviceProperties> devices;
         for (auto& dt : deviceManager.getAvailableDeviceTypes()) {
             for (bool input : {false, true}) {
                 auto deviceNames = dt->getDeviceNames(input);
                 for (int i : vi::iota(0, deviceNames.size())) {
                     auto dn = deviceNames[i];
                     unique_ptr<juce::AudioIODevice> d(input ? dt->createDevice("", dn) : dt->createDevice(dn, ""));
-                    devices.push_back(AudioDevice{
-                      .ioo = input ? InputOrOutput::in : InputOrOutput::out,
+                    devices.push_back(AudioDeviceProperties{
+                      .ioo = input ? InOrOut::in : InOrOut::out,
                       .name = d->getName().toStdString(),
                       .type = d->getTypeName().toStdString(),
                       .channelNames = toVectorString(input ? d->getInputChannelNames() : d->getOutputChannelNames()),
@@ -144,7 +144,7 @@ struct AudioIOImpl
         }
         return devices;
     }
-    expected<AudioSettings, string>
+    expected<ActiveAudioDevices, string>
     initialize(optional<string> outputDeviceName, optional<string> inputDeviceName) override
     {
         auto ads = deviceManager.getAudioDeviceSetup();
@@ -166,13 +166,13 @@ struct AudioIOImpl
                 deviceManager.closeAudioDevice();
             }
         }
-        return getAudioSettings();
+        return getActiveAudioDevices();
     }
-    AudioSettings getAudioSettings() override
+    ActiveAudioDevices getActiveAudioDevices() override
     {
         auto ads = deviceManager.getAudioDeviceSetup();
         if (ads.outputDeviceName.isEmpty() && ads.inputDeviceName.isEmpty()) {
-            return AudioSettings{};
+            return ActiveAudioDevices{};
         }
         juce::StringArray outputChannelNames, inputChannelNames;
         {
@@ -183,7 +183,7 @@ struct AudioIOImpl
             inputChannelNames = d->getInputChannelNames();
         }
         LOG(INFO) << fmt::format(
-          "getAudioSettings ({}Hz/{}) out: {} {}, in: {} {}",
+          "getActiveAudioDevices ({}Hz/{}) out: {} {}, in: {} {}",
           ads.sampleRate,
           ads.bufferSize,
           ads.outputDeviceName.toStdString(),
@@ -192,7 +192,7 @@ struct AudioIOImpl
           toString(inputChannelNames, ads.inputChannels)
         );
 
-        return AudioSettings{
+        return ActiveAudioDevices{
           .outputDevice = toAudioSettingsDevice(ads.outputDeviceName, outputChannelNames, ads.outputChannels),
           .inputDevice = toAudioSettingsDevice(ads.inputDeviceName, inputChannelNames, ads.inputChannels),
           .bufferSize = ads.bufferSize,
@@ -204,7 +204,7 @@ struct AudioIOImpl
         juce::ScopedLock scopedLock(deviceManager.getAudioCallbackLock());
         deviceCallback.audioCallback = MOVE(callbackFn);
     }
-    expected<void, string> enableInputOrOutput(InputOrOutput ioo, string_view name, bool enabled) override
+    expected<void, string> enableInOrOut(InOrOut ioo, string_view name, bool enabled) override
     {
         LOG(INFO) << fmt::format("enableInput(\"{}\", {})", name, enabled);
         auto ads = deviceManager.getAudioDeviceSetup();

@@ -2,13 +2,13 @@
 
 #include "common/std.h"
 
-struct UIState;
+struct AppState;
+class ReactiveStateEngine;
 
 class UI
 {
 public:
-    static unique_ptr<UI> make();
+    static unique_ptr<UI> make(const AppState& appState, ReactiveStateEngine& rse);
     virtual ~UI() = default;
     virtual void render() = 0;
-    virtual UIState* getUIState() = 0;
 };

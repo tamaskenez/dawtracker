@@ -1,7 +1,5 @@
 #include "UI.h"
 
-#include "UIState.h"
-
 #include "common/msg.h"
 #include "platform/AppMsgQueue.h"
 
@@ -31,7 +29,15 @@ string makeMenuShortcutString(string_view s)
 
 struct UIImpl : public UI {
     bool show_demo_window = false;
-    UIState uiState;
+    const AppState& appState;
+    ReactiveStateEngine& rse;
+
+    UIImpl(const AppState& appStateArg, ReactiveStateEngine& rseArg)
+        : appState(appStateArg)
+        , rse(rseArg)
+    {
+    }
+
     void render() override
     {
         ImGuiIO& io = ImGui::GetIO();
@@ -216,13 +222,9 @@ struct UIImpl : public UI {
         // Rendering
         ImGui::Render();
     }
-    UIState* getUIState() override
-    {
-        return &uiState;
-    }
 };
 
-unique_ptr<UI> UI::make()
+unique_ptr<UI> UI::make(const AppState& appState, ReactiveStateEngine& rse)
 {
-    return make_unique<UIImpl>();
+    return make_unique<UIImpl>(appState, rse);
 }
