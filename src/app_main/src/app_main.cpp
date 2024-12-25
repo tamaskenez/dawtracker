@@ -21,7 +21,9 @@
 namespace
 {
 constexpr auto k_minUIRefreshInterval = chr::milliseconds(50);
-}
+constexpr auto k_maxUIRefreshInterval = chr::milliseconds(200);
+constexpr double k_refreshIntervalIncreaesFactorWhenNoEvents = 1.05;
+} // namespace
 
 //// This example doesn't compile with Emscripten yet! Awaiting SDL3 support.
 // #ifdef __EMSCRIPTEN__
@@ -80,6 +82,9 @@ int main(int, char**)
     // io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f,
     // nullptr, io.Fonts->GetGlyphRangesJapanese()); IM_ASSERT(font != nullptr);
 
+    static const ImWchar glyphRange[] = {32, 255, 0x2310, 0x2320, 0};
+    // TODO: Bundle some font with the application.
+    io.Fonts->AddFontFromFileTTF("/System/Library/Fonts/HelveticaNeue.ttc", 18, nullptr, glyphRange);
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -96,6 +101,7 @@ int main(int, char**)
     // Main loop
     bool done = false;
     optional<chr::high_resolution_clock::time_point> lastUIRefreshStartTime;
+    auto targetRefreshInterval = chr::duration<double>(k_minUIRefreshInterval);
 #ifdef __EMSCRIPTEN__
     // For an Emscripten build we are disabling file-system access, so let's not
     // attempt to do a fopen() of the imgui.ini file. You may manually call
@@ -122,7 +128,7 @@ int main(int, char**)
                 if (!lastUIRefreshStartTime) {
                     break;
                 }
-                auto timeout = k_minUIRefreshInterval - (chr::high_resolution_clock::now() - *lastUIRefreshStartTime);
+                auto timeout = targetRefreshInterval - (chr::high_resolution_clock::now() - *lastUIRefreshStartTime);
                 if (timeout < chr::milliseconds(1)) {
                     break;
                 }
@@ -158,6 +164,15 @@ int main(int, char**)
             continue;
         }
         if (app->getAndClearIfUIRefreshNeeded() || hadAnSDLEvent) {
+            targetRefreshInterval = k_minUIRefreshInterval;
+        } else {
+            targetRefreshInterval = std::min(
+              targetRefreshInterval * k_refreshIntervalIncreaesFactorWhenNoEvents,
+              chr::duration<double>(k_maxUIRefreshInterval)
+            );
+        }
+        // Render UI frame.
+        {
             // Start the Dear ImGui frame
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
