@@ -113,6 +113,7 @@ public:
             return false;
         }
         k = std::forward<V>(newValue);
+        v.timestamp = nextTimestamp++;
         for (auto d : v.downstreamVariables) {
             markThisAndTransitiveDependenciesOutOfDate(d);
         }
@@ -129,6 +130,7 @@ public:
         auto& v = variables[offset];
         CHECK(!v.updateFn && v.upstreamVariables.empty()); // Variables with updateFn should not be set directly.
         k = std::forward<V>(newValue);
+        v.timestamp = nextTimestamp++;
         for (auto d : v.downstreamVariables) {
             markThisAndTransitiveDependenciesOutOfDate(d);
         }
@@ -144,18 +146,22 @@ private:
     struct Variable {
         // Once a variable gets an updater, this field is reinitialized to false.
         bool upToDate = true;
+        uint64_t timestamp = 1;
+        uint64_t upstreamProcessedUntilTimestamp = 0;
 
         vector<intptr_t> upstreamVariables;   // Variables which this variable's updateFn uses as input.
         vector<intptr_t> downstreamVariables; // Variables dependending on this variable.
-        function<bool()> updateFn;            // Return true if changed.
+        function<bool(Variable&)> updateFn;   // Return true if changed.
 
         // `offset` can be added only once.
         void addDownstreamVariable(intptr_t offset);
     };
     unordered_map<intptr_t, Variable> variables;
     optional<vector<intptr_t>> inputCollectorDuringRegistration;
+    uint64_t nextTimestamp = 1; // timestamp = 0 means uninitialized
 
     bool updateIfNeededCore(intptr_t koffset);
+    bool updateIfNeededCore2(Variable& vk);
     void markThisAndTransitiveDependenciesOutOfDate(intptr_t offset);
     void markChangedPrivate(intptr_t offset);
 
@@ -174,12 +180,15 @@ private:
         } else {
             updaterFnArg();
         }
-        v.updateFn = [&k, updateFn = MOVE(updaterFnArg)]() -> bool {
+        // Passing Variable& instead of capturing: allows us to use a hash container which invalidates values on update.
+        v.updateFn = [this, &k, updateFn = MOVE(updaterFnArg)](Variable& v2) -> bool {
             auto newValue = updateFn();
             if (newValue == k) {
                 return false;
             }
             k = MOVE(newValue);
+            v2.timestamp = nextTimestamp++;
+
             return true;
         };
 

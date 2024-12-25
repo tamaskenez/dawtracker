@@ -24,11 +24,23 @@ bool ReactiveStateEngine::updateIfNeededCore(intptr_t koffset)
         inputCollectorDuringRegistration->push_back(koffset);
         return false;
     }
-    auto& vk = variables[koffset];
+    return updateIfNeededCore2(variables[koffset]);
+}
 
+bool ReactiveStateEngine::updateIfNeededCore2(Variable& vk)
+{
     if (vk.upToDate) {
         // This might be an input variable (no updateFn, always up-to-date) or normal variable that happens to be
         // up-to-date.
+#ifndef NDEBUG
+        // If this is up-to-date, the upstream variables
+        // - must be all up-to-date
+        // - they must not have a timestamp greater than upstreamProcessedUntilTimestamp.
+        for (auto uv : vk.upstreamVariables) {
+            auto& vuv = variables[uv];
+            CHECK(vuv.upToDate && vuv.timestamp <= vk.upstreamProcessedUntilTimestamp);
+        }
+#endif
         return false;
     }
 
@@ -42,15 +54,17 @@ bool ReactiveStateEngine::updateIfNeededCore(intptr_t koffset)
 #endif
 
     // Make sure all upstream dependencies are up-to-date.
-    // TODO: reintroduce timestamps and initialize needToCallUpdater with false.
-    bool needToCallUpdater = true;
+    auto maxUpstreamTimestamp = vk.upstreamProcessedUntilTimestamp;
     for (auto uv : vk.upstreamVariables) {
-        if (updateIfNeededCore(uv)) {
-            needToCallUpdater = true;
+        auto& vuv = variables[uv];
+        if (updateIfNeededCore2(vuv) || maxUpstreamTimestamp < vuv.timestamp) {
+            assert(maxUpstreamTimestamp < vuv.timestamp);
+            maxUpstreamTimestamp = vuv.timestamp;
         }
     }
-    bool changed = needToCallUpdater && vk.updateFn();
+    bool changed = vk.upstreamProcessedUntilTimestamp < maxUpstreamTimestamp && vk.updateFn(vk);
     vk.upToDate = true;
+    vk.upstreamProcessedUntilTimestamp = maxUpstreamTimestamp;
     return changed;
 }
 
@@ -68,6 +82,7 @@ ReactiveStateEngine::Variable& ReactiveStateEngine::registerUpdaterCore_prepare(
     CHECK(!v.updateFn);
 
     v.upToDate = false;
+    v.timestamp = 0;
 
     CHECK(!inputCollectorDuringRegistration);
     inputCollectorDuringRegistration.emplace();
