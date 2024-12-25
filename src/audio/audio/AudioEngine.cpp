@@ -107,6 +107,10 @@ struct AudioEngineImpl : public AudioEngine {
                     break;
                 }
             }
+            std::string c;
+            for (auto& rb : recordingBuffers) {
+                c += rb.sentToApp ? 'S' : '.';
+            }
             if (!recordingBuffer) {
                 sendToApp(MAKE_VARIANT_V(msg::AudioEngine, NoFreeRecordingBuffer{}));
             } else {
@@ -116,7 +120,10 @@ struct AudioEngineImpl : public AudioEngine {
                     std::copy_n(inputChannels[i], bufferSize, recordingBuffer->channels[i].begin());
                 }
                 recordingBuffer->sentToApp = true;
-                sendToApp(MAKE_VARIANT_V(msg::AudioEngine, RecordingBufferRecorded{recordingBuffer}));
+                LOG(INFO) << fmt::format("[{}]->sentToApp = true {}", fmt::ptr(recordingBuffer), c);
+                sendToApp(msg::AudioEngine::V(
+                  msg::AudioEngine::RecordingBufferRecorded{recordingBuffer, chr::high_resolution_clock::now()}
+                ));
             }
         }
     }

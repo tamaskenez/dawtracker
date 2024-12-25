@@ -34,12 +34,14 @@ struct AppState {
     vector<AudioChannelPropertiesOnUI> inputs;
     vector<AudioChannelPropertiesOnUI> outputs;
 
+    ActiveAudioDevices activeAudioDevices;
+    vector<AudioClip> clips;
+
+    monostate anyVariableDisplayedOnUIChanged;
+    monostate metronomeChanged;
+
     optional<double> clipBeingRecordedSeconds;
     optional<double> playedTime;
-    ActiveAudioDevices activeAudioDevices;
     optional<AudioClip> clipBeingRecorded;
     bool clipBeingPlayed = false;
-    vector<AudioClip> clips;
-    bool metronomeChanged = false;
-    bool anyVariableDisplayedOnUIChanged = false;
 };

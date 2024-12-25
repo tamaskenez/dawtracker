@@ -109,3 +109,30 @@ R intCast(T t)
         return static_cast<R>(t);
     }
 }
+
+template<class R, class T>
+R clampCast(T t)
+{
+    static_assert(std::is_integral_v<R>, "The result type of clampCast should be integer.");
+    static_assert(std::is_integral_v<T>, "Argument for clampCast should be integer.");
+    if (std::in_range<R>(t)) {
+        return static_cast<R>(t);
+    }
+    if constexpr (std::is_signed_v<R>) {
+        if constexpr (std::is_signed_v<T>) {
+            // signed -> signed
+            return t > 0 ? std::numeric_limits<R>::max() : std::numeric_limits<R>::min();
+        } else {
+            // unsigned -> signed
+            return std::numeric_limits<R>::max();
+        }
+    } else {
+        if constexpr (std::is_signed_v<T>) {
+            // signed -> unsigned
+            return t > 0 ? std::numeric_limits<R>::max() : 0;
+        } else {
+            // unsigned -> unsigned
+            std::numeric_limits<R>::max();
+        }
+    }
+}

@@ -69,6 +69,7 @@ struct NoFreeRecordingBuffer {
 };
 struct RecordingBufferRecorded {
     RecordingBuffer* recordingBuffer;
+    chr::high_resolution_clock::time_point timestamp;
 };
 struct PlayedTime {
     optional<double> t;

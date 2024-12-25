@@ -26,6 +26,7 @@
 class ReactiveStateEngine
 {
 public:
+    // TODO: consider a `modify` function instead of `BorrowedVariableToSet`.
     template<class K>
     class BorrowedVariableToSet
     {
@@ -68,20 +69,25 @@ public:
     template<class T, class Fn>
     void registerUpdater(T& k, Fn&& updaterFnArg)
     {
-        registerUpdaterCore(k, function<T()>(std::forward<Fn>(updaterFnArg)));
+        registerUpdaterCore(k, function<T()>(std::forward<Fn>(updaterFnArg)), nullopt);
     }
 
-    // Return true if it had to be updated (wasn't up-to-date).
+    template<class T, class Fn, class... UpstreamVariables>
+    void registerUpdater(T& k, Fn&& updaterFnArg, const UpstreamVariables&... upstreamVariables)
+    {
+        registerUpdaterCore(
+          k, function<T()>(std::forward<Fn>(updaterFnArg)), initializer_list<intptr_t>{getOffset(upstreamVariables)...}
+        );
+    }
+
+    // Return true if it had to be updated (the value has changed during the update).
     template<class T>
     bool updateIfNeeded(const T& k)
     {
         return updateIfNeededCore(getOffset(k));
     }
 
-    // Query the value of k.
-    //
-    // If it is called withing a registered update function, the variableBeingUpdatedStack won't be empty
-    // and a dependency relationship will be established between `variableBeingUpdatedStack.back()` and `k`.
+    // Query the value of k. Might call the updater function.
     template<class T>
     const T& get(const T& k)
     {
@@ -89,28 +95,31 @@ public:
         return k;
     }
 
-    // Assign new value to the variable, and
-    // - if this is the initial `set` for the variable, or
-    // - the new value is different from the current one
-    // then recursively mark dependencies as outdated.
+    template<class T>
+    bool isUpToDate(const T& k)
+    {
+        return variables[getOffset(k)].upToDate;
+    }
+
+    // Assign new value to the variable, and mark all transitive dependencies outdated if the new value is different
+    // from the current one.
     template<class K, class V>
     bool set(K& k, V&& newValue)
     {
         auto offset = getOffset(k);
         auto& v = variables[offset];
-        if (v.timestamp > 0 && k == newValue) {
+        CHECK(!v.updateFn && v.upstreamVariables.empty()); // Variables with updateFn should not be set directly.
+        if (newValue == k) {
             return false;
         }
         k = std::forward<V>(newValue);
-        v.timestamp = nextTimestamp++;
-        for (auto d : v.dependents) {
-            bumpThisAndDownstreamVariablesMaxUpstreamTimestamp(d, v.timestamp);
+        for (auto d : v.downstreamVariables) {
+            markThisAndTransitiveDependenciesOutOfDate(d);
         }
         return true;
     }
 
-    // Assign new value to the variable and recursively mark dependencies as outdated.
-    // Do not compare new value to the existing value, always assume that it has changed.
+    // Like `set` but do not compare new value to the existing value, always assume that it has changed.
     // `setAsDifferent` is a useful alternative to `set` if we don't want to call the equality operator for the type
     // (because it doesn not exist or expensive).
     template<class K, class V>
@@ -118,10 +127,10 @@ public:
     {
         auto offset = getOffset(k);
         auto& v = variables[offset];
+        CHECK(!v.updateFn && v.upstreamVariables.empty()); // Variables with updateFn should not be set directly.
         k = std::forward<V>(newValue);
-        v.timestamp = nextTimestamp++;
-        for (auto d : v.dependents) {
-            bumpThisAndDownstreamVariablesMaxUpstreamTimestamp(d, v.timestamp);
+        for (auto d : v.downstreamVariables) {
+            markThisAndTransitiveDependenciesOutOfDate(d);
         }
     }
 
@@ -132,75 +141,54 @@ public:
     }
 
 private:
-    bool updateIfNeededCore(intptr_t koffset)
-    {
-        auto& vk = variables[koffset];
+    struct Variable {
+        // Once a variable gets an updater, this field is reinitialized to false.
+        bool upToDate = true;
 
-        if (!variableBeingUpdatedStack.empty()) {
-            auto qoffset = variableBeingUpdatedStack.back();
-            assert(qoffset != koffset);
-            if (vk.addDependent(qoffset)) {
-                auto& vq = variables[qoffset];
-                if (vk.timestamp > vq.maxUpstreamTimestamp) {
-                    vq.maxUpstreamTimestamp = vk.timestamp;
-                }
-            }
-        }
+        vector<intptr_t> upstreamVariables;   // Variables which this variable's updateFn uses as input.
+        vector<intptr_t> downstreamVariables; // Variables dependending on this variable.
+        function<bool()> updateFn;            // Return true if changed.
 
-        if (vk.maxUpstreamTimestamp <= vk.timestamp && vk.timestamp > 0) {
-            return false;
-        }
+        // `offset` can be added only once.
+        void addDownstreamVariable(intptr_t offset);
+    };
+    unordered_map<intptr_t, Variable> variables;
+    optional<vector<intptr_t>> inputCollectorDuringRegistration;
 
-        // Getting the value of an uninitialized (timestamp==0) or stale (maxUpstreamTimestamp > timestamp) variable.
+    bool updateIfNeededCore(intptr_t koffset);
+    void markThisAndTransitiveDependenciesOutOfDate(intptr_t offset);
+    void markChangedPrivate(intptr_t offset);
 
-        assert(vk.updateFn);
-        vk.updateFn();
-
-        return true;
-    }
+    Variable& registerUpdaterCore_prepare(intptr_t offset);
+    void registerUpdaterCore_finalize(intptr_t offset, Variable& v);
 
     template<class T>
-    void registerUpdaterCore(T& k, function<T()> updaterFnArg)
+    void registerUpdaterCore(T& k, function<T()> updaterFnArg, optional<initializer_list<intptr_t>> upstreamVariableIds)
     {
         auto offset = getOffset(k);
-        auto& v = variables[offset];
-        assert(!v.updateFn);
-        v.timestamp = 0;
-        v.updateFn = [this, &k, updateFn = MOVE(updaterFnArg), offset]() {
-            variableBeingUpdatedStack.push_back(offset);
-            set(k, updateFn());
-            assert(!variableBeingUpdatedStack.empty());
-            variableBeingUpdatedStack.pop_back();
-        };
-    }
 
-    void bumpThisAndDownstreamVariablesMaxUpstreamTimestamp(intptr_t offset, uint64_t timestamp);
+        auto& v = registerUpdaterCore_prepare(offset);
+
+        if (upstreamVariableIds) {
+            inputCollectorDuringRegistration.value().assign(*upstreamVariableIds);
+        } else {
+            updaterFnArg();
+        }
+        v.updateFn = [&k, updateFn = MOVE(updaterFnArg)]() -> bool {
+            auto newValue = updateFn();
+            if (newValue == k) {
+                return false;
+            }
+            k = MOVE(newValue);
+            return true;
+        };
+
+        registerUpdaterCore_finalize(offset, v);
+    }
 
     template<class K>
     intptr_t getOffset(const K& k) const
     {
         return reinterpret_cast<intptr_t>(&k);
     }
-    void markChangedPrivate(intptr_t offset)
-    {
-        auto& v = variables[offset];
-        v.timestamp = nextTimestamp++;
-        for (auto d : v.dependents) {
-            bumpThisAndDownstreamVariablesMaxUpstreamTimestamp(d, v.timestamp);
-        }
-    }
-
-    struct Variable {
-        uint64_t maxUpstreamTimestamp = 0;
-        uint64_t timestamp = 1;
-        // Dependents are other variables that should be updated when this is changing.
-        vector<intptr_t> dependents;
-        function<void()> updateFn;
-
-        bool addDependent(intptr_t d);
-    };
-
-    uint64_t nextTimestamp = 1;
-    unordered_map<intptr_t, Variable> variables;
-    vector<intptr_t> variableBeingUpdatedStack;
 };

@@ -14,6 +14,8 @@
 namespace
 {
 
+constexpr auto k_targetBufferTimeRange = chr::seconds(1);
+
 string makeMenuShortcutString(string_view s)
 {
     const char* prefix{};
@@ -50,7 +52,7 @@ struct UIImpl : public UI {
         ImGui::SetNextWindowSize(io.DisplaySize);
 
         ImGui::Begin(
-          "MainWindow",
+          "MainWindow...this is not displayed",
           nullptr,
           ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse
             | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings
@@ -69,6 +71,32 @@ struct UIImpl : public UI {
             }
             ImGui::EndMainMenuBar();
         }
+
+        double avgUIRefreshHz = NAN;
+        double maxDt = NAN;
+        double avgDt = NAN;
+        if (frameTimes.size() > 1) {
+            auto maxDuration = frameTimes[0].dt;
+            auto sumDuration = chr::high_resolution_clock::duration::zero();
+            auto minT = frameTimes[0].t;
+            auto maxT = frameTimes[0].t;
+            for (auto& f : frameTimes) {
+                maxDuration = std::max(maxDuration, f.dt);
+                sumDuration += f.dt;
+                minT = std::min(minT, f.t);
+                maxT = std::max(maxT, f.t);
+            }
+            maxDt = chr::duration<double>(maxDuration).count();
+            avgDt = chr::duration<double>(sumDuration).count() / frameTimes.size();
+            avgUIRefreshHz = (frameTimes.size() - 1) / chr::duration<double>(maxT - minT).count();
+        }
+        ImGui::TextUnformatted(fmt::format(
+                                 "Average UI refresh: {:.2f} Hz, UI repaint time: {:.2f} ms (max {:.2f} ms)",
+                                 avgUIRefreshHz,
+                                 avgDt * 1000,
+                                 maxDt * 1000
+        )
+                                 .c_str());
         ImGui::Checkbox("Demo Window",
                         &show_demo_window); // Edit bools storing our window open/close state
         bool on = rse.get(appState.metronome.on);
@@ -235,6 +263,27 @@ struct UIImpl : public UI {
 
         // Rendering
         ImGui::Render();
+    }
+    struct FrameTimeItem {
+        chr::high_resolution_clock::time_point t;
+        chr::high_resolution_clock::duration dt;
+    };
+    vector<FrameTimeItem> frameTimes;
+    size_t nextFrameTimeIx = 0;
+    void addFrameTime(chr::high_resolution_clock::time_point t, chr::high_resolution_clock::duration dt) override
+    {
+        // Maintain frameTimes as a circular buffer.
+        if (frameTimes.size() <= nextFrameTimeIx) {
+            frameTimes.push_back(FrameTimeItem{t, dt});
+            nextFrameTimeIx = frameTimes.size();
+        } else {
+            frameTimes[nextFrameTimeIx++] = FrameTimeItem{t, dt};
+        }
+        auto bufferTimeRange = t - frameTimes[0].t;
+        if (bufferTimeRange > k_targetBufferTimeRange) {
+            frameTimes.resize(nextFrameTimeIx);
+            nextFrameTimeIx = 0;
+        }
     }
 };
 

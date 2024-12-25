@@ -18,7 +18,4 @@ inline Platform getPlatform()
 #endif
 }
 
-uint32_t refreshUISdlEventType();
-
 void sendQuitEventToAppMain();
-void sendRefreshUIEventToAppMain();

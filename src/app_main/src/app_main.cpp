@@ -18,6 +18,11 @@
   #include <SDL3/SDL_opengl.h>
 #endif
 
+namespace
+{
+constexpr auto k_minUIRefreshInterval = chr::milliseconds(50);
+}
+
 //// This example doesn't compile with Emscripten yet! Awaiting SDL3 support.
 // #ifdef __EMSCRIPTEN__
 //   #include "../libs/emscripten/emscripten_mainloop_stub.h"
@@ -90,6 +95,7 @@ int main(int, char**)
 
     // Main loop
     bool done = false;
+    optional<chr::high_resolution_clock::time_point> lastUIRefreshStartTime;
 #ifdef __EMSCRIPTEN__
     // For an Emscripten build we are disabling file-system access, so let's not
     // attempt to do a fopen() of the imgui.ini file. You may manually call
@@ -110,12 +116,32 @@ int main(int, char**)
         // keyboard data. Generally you may always pass all inputs to dear imgui,
         // and hide them from your application based on those two flags.
         SDL_Event event;
-        while (SDL_PollEvent(&event)) {
+        bool hadAnSDLEvent = false;
+        for (bool waitForEvent = false;;) {
+            if (waitForEvent) {
+                if (!lastUIRefreshStartTime) {
+                    break;
+                }
+                auto timeout = k_minUIRefreshInterval - (chr::high_resolution_clock::now() - *lastUIRefreshStartTime);
+                if (timeout < chr::milliseconds(1)) {
+                    break;
+                }
+                auto timeoutMs = clampCast<Sint32>(chr::duration_cast<chr::milliseconds>(timeout).count());
+                if (!SDL_WaitEventTimeout(&event, timeoutMs)) {
+                    break;
+                }
+            } else {
+                if (!SDL_PollEvent(&event)) {
+                    waitForEvent = true;
+                    continue;
+                }
+            }
+            hadAnSDLEvent = true;
             if (event.type == appQueueNotificationSdlEventType()) {
                 tryDequeueAndMakeAppReceiveIt();
-            } else if (event.type == refreshUISdlEventType()) {
-                // Nothing to do, UI will be repainted below.
             } else {
+                static int counter = 0;
+                fmt::println("sdl event {} {}", event.type, counter++);
                 ImGui_ImplSDL3_ProcessEvent(&event);
                 if (event.type == SDL_EVENT_QUIT) {
                     done = true;
@@ -125,29 +151,27 @@ int main(int, char**)
                     done = true;
                 }
             }
-            app->runAudioIODispatchLoop();
-
-            // SDL_Event e;
-            // SDL_zero(e);
-            // e.type = SDL_EVENT_USER;
-            // SDL_PushEvent(&e);
         }
+        app->runAudioIODispatchLoop();
+        lastUIRefreshStartTime = chr::high_resolution_clock::now();
         if (SDL_GetWindowFlags(sdl->window()) & SDL_WINDOW_MINIMIZED) {
-            SDL_Delay(10);
             continue;
         }
-
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ui->render();
-        glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-        glClearColor(
-          clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w
-        );
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(sdl->window());
+        if (app->getAndClearIfUIRefreshNeeded() || hadAnSDLEvent) {
+            // Start the Dear ImGui frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ui->render();
+            glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+            glClearColor(
+              clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w
+            );
+            glClear(GL_COLOR_BUFFER_BIT);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            SDL_GL_SwapWindow(sdl->window());
+            auto t1 = chr::high_resolution_clock::now();
+            ui->addFrameTime(*lastUIRefreshStartTime, t1 - *lastUIRefreshStartTime);
+        }
     }
 #ifdef __EMSCRIPTEN__
     EMSCRIPTEN_MAINLOOP_END;

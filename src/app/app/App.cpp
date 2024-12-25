@@ -91,25 +91,32 @@ struct AppImpl
         rse.registerUpdater(appState.stopButton, [this]() {
             return rse.get(appState.clipBeingPlayed) || rse.get(appState.clipBeingRecorded).has_value();
         });
-        rse.registerUpdater(appState.anyVariableDisplayedOnUIChanged, [this]() {
-            rse.get(appState.audioSettingsUI);
-            rse.get(appState.showAudioSettings);
-            rse.get(appState.metronome);
-            rse.get(appState.recordButtonEnabled);
-            rse.get(appState.stopButtonEnabled);
-            rse.get(appState.playButtonEnabled);
-            rse.get(appState.recordButton);
-            rse.get(appState.stopButton);
-            rse.get(appState.playButton);
-            rse.get(appState.inputs);
-            rse.get(appState.outputs);
-            rse.get(appState.clips);
-            return true;
-        });
-        rse.registerUpdater(appState.metronomeChanged, [this]() {
-            rse.get(appState.metronome);
-            return true;
-        });
+        rse.registerUpdater(
+          appState.anyVariableDisplayedOnUIChanged,
+          []() {
+              return monostate{};
+          },
+          appState.audioSettingsUI,
+          appState.showAudioSettings,
+          appState.metronome,
+          appState.recordButtonEnabled,
+          appState.stopButtonEnabled,
+          appState.playButtonEnabled,
+          appState.recordButton,
+          appState.stopButton,
+          appState.playButton,
+          appState.inputs,
+          appState.outputs,
+          appState.clips
+        );
+        fmt::println("appState.metronome: {}", reinterpret_cast<intptr_t>(&appState.metronome));
+        rse.registerUpdater(
+          appState.metronomeChanged,
+          []() {
+              return monostate{};
+          },
+          appState.metronome
+        );
         rse.registerUpdater(appState.inputs, [this]() {
             vector<AudioChannelPropertiesOnUI> inputs;
             if (auto id = rse.get(appState.activeAudioDevices).inputDevice) {
@@ -211,6 +218,7 @@ struct AppImpl
               metronome.bpm = x.bpm;
           }
         );
+        fmt::println("appState.metronome: {}", reinterpret_cast<intptr_t>(&appState.metronome));
         rse.set(appState.metronome, MOVE(metronome));
     }
 
@@ -276,16 +284,21 @@ struct AppImpl
               CHECK(clipBeingRecordedBorrow->has_value() && !(*clipBeingRecordedBorrow)->channels.empty());
               (*clipBeingRecordedBorrow)->append(*x.recordingBuffer);
               x.recordingBuffer->sentToApp = false;
+              LOG(INFO) << fmt::format(
+                "[{}]->sentToApp = false, {} ms",
+                fmt::ptr(x.recordingBuffer),
+                1000.0 * chr::duration<double>(chr::high_resolution_clock::now() - x.timestamp)
+              );
               rse.set(
                 appState.clipBeingRecordedSeconds,
                 (*clipBeingRecordedBorrow)->channels[0].size() / rse.get(appState.activeAudioDevices).sampleRate
               );
-              sendRefreshUIEventToAppMain();
           },
           [this](const msg::AudioEngine::PlayedTime& x) {
               rse.set(appState.playedTime, x.t);
           }
         );
+        NOP;
     }
     void playClip(size_t i)
     {
@@ -326,14 +339,12 @@ struct AppImpl
             LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
         }
 
-        if (rse.updateIfNeeded(appState.metronomeChanged)) {
+        if (!rse.isUpToDate(appState.metronomeChanged)) {
+            rse.updateIfNeeded(appState.metronomeChanged);
             audioEngine->sendStateChangerFn([metronome = appState.metronome](AudioEngineState& s) {
                 s.metronome.on = metronome.on;
                 s.metronome.bpm = metronome.bpm;
             });
-        }
-        if (rse.updateIfNeeded(appState.anyVariableDisplayedOnUIChanged)) {
-            sendRefreshUIEventToAppMain();
         }
     }
 
@@ -351,6 +362,14 @@ struct AppImpl
               audioEngine->audioCallbacksStopped();
           }
         );
+    }
+    bool getAndClearIfUIRefreshNeeded() override
+    {
+        if (rse.isUpToDate(appState.anyVariableDisplayedOnUIChanged)) {
+            return false;
+        }
+        rse.updateIfNeeded(appState.anyVariableDisplayedOnUIChanged);
+        return true;
     }
 };
 

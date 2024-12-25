@@ -14,4 +14,5 @@ public:
 
     virtual void receive(std::any&& msg) = 0;
     virtual void runAudioIODispatchLoop() = 0;
+    virtual bool getAndClearIfUIRefreshNeeded() = 0;
 };
