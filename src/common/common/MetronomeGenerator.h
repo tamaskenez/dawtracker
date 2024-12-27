@@ -5,5 +5,5 @@
 struct MetronomeGenerator {
     double timeSinceLastStart = 0;
 
-    void generate(double fs, float bpm, span<float> buf);
+    void generate(double fs, double bpm, span<float> buf);
 };

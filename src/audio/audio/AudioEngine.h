@@ -1,13 +1,13 @@
 #pragma once
 
-#include "common/std.h"
+#include "common/common.h"
 
 #include "common/AudioClip.h"
 
 struct AudioEngineState {
     struct Metronome {
         bool on = false;
-        float bpm;
+        Rational bpm;
     } metronome;
 
     // todo these should be one data.

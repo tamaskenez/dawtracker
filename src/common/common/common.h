@@ -9,6 +9,7 @@
 #include "fmt/format.h"
 #include "fmt/ranges.h"
 #include "fmt/std.h"
+#include "boost/rational.hpp"
 
 #define MOVE(X) std::move(X)
 
@@ -70,6 +71,8 @@ inline void __inline_void_function_with_empty_body__() {}
 //     auto v = std::variant<MySumType::V>(MySumType::A{3});
 //
 #define MAKE_VARIANT_V(NAMESPACE, CONSTRUCTOR_CALL_IN_NAMESPACE) NAMESPACE::V(NAMESPACE::CONSTRUCTOR_CALL_IN_NAMESPACE)
+
+using Rational = boost::rational<int64_t>;
 
 // Return if the integer `x` is between 0 and t.size()
 template<class X, class T>
@@ -142,5 +145,13 @@ R floatCast(T t)
 {
     static_assert(std::is_floating_point_v<R>, "The result type of floatCast should be floating point.");
     static_assert(std::is_floating_point_v<T>, "Argument for floatCast should be floating point.");
+    return static_cast<R>(t);
+}
+
+template<class R, class T>
+R intFromFloat(T t){
+    static_assert(std::is_integral_v<R>, "The result type of intFromFloat should be integer.");
+    static_assert(std::is_floating_point_v<T>, "Argument for intFromFloat should be floating point.");
+    assert(static_cast<T>(std::numeric_limits<R>::min()) <= t && t <= static_cast<T>(std::numeric_limits<R>::max()));
     return static_cast<R>(t);
 }

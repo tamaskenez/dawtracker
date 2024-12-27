@@ -1,15 +1,13 @@
 #pragma once
 
-#include "std.h"
+#include "common.h"
 
 #include "AudioClip.h"
 #include "audiodevicetypes.h"
 
-#include "boost/rational.hpp"
-using Rational = boost::rational<int64_t>;
-
 struct TimeSignature {
     int upper, lower;
+    bool    operator==(const TimeSignature&)const=default;
 };
 struct Bar {
     TimeSignature timeSignature;
@@ -20,18 +18,19 @@ struct Bars {
     vector<Bar> bars;
     Rational duration(Rational tempo) const;
 };
-struct Beats {
-    Rational beats;
+
+struct Period {
+    Rational wholeNotes;
     Rational duration(Rational tempo) const;
 };
 struct Duration {
-    Rational duration;
+    Rational seconds;
 };
 
 struct ArrangementSection {
     string name;
     optional<Rational> tempo;
-    variant<Bars, Beats, Duration> structure;
+    variant<Bars, Period, Duration> structure;
 
     Rational duration(Rational defaultTempo) const;
 };
@@ -61,7 +60,9 @@ struct AppState {
 
     struct Metronome {
         bool on = false;
-        float bpm = 120.0;
+        Rational tempo {120,4};
+        TimeSignature timeSignature = TimeSignature{4,4};
+        Rational bpm()const;
         bool operator==(const Metronome&) const = default;
     } metronome;
 

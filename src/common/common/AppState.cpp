@@ -20,10 +20,11 @@ const string& AppState::AudioSettingsUI::selectedInputDeviceName() const
 
 AppState::AppState()
 {
+    auto ts88 = TimeSignature{8, 8};
     auto ts44 = TimeSignature{4, 4};
     auto ts34 = TimeSignature{3, 4};
     auto v1 = ArrangementSection{
-      .name = "Verse 1", .structure = Bars{.bars = {Bar{.timeSignature = ts44}, Bar{.timeSignature = ts44}}}
+      .name = "Verse 1", .structure = Bars{.bars = {Bar{.timeSignature = ts44}, Bar{.timeSignature = ts88}}}
     };
     auto v2 = ArrangementSection{
       .name = "Verse 2", .structure = Bars{.bars = {Bar{.timeSignature = ts44}, Bar{.timeSignature = ts34}}}
@@ -42,18 +43,18 @@ Rational ArrangementSection::duration(Rational defaultTempo) const
       [&](const Bars& x) {
           return x.duration(actualTempo);
       },
-      [&](const Beats& x) {
+      [&](const Period& x) {
           return x.duration(actualTempo);
       },
       [](const Duration& x) {
-          return x.duration;
+          return x.seconds;
       }
     );
 }
 
 Rational Bar::duration(Rational tempo) const
 {
-    return (60 * timeSignature.upper) / tempo;
+    return Rational(60 * timeSignature.upper,timeSignature.lower) / tempo;
 }
 Rational Bars::duration(Rational tempo) const
 {
@@ -63,7 +64,11 @@ Rational Bars::duration(Rational tempo) const
     }
     return r;
 }
-Rational Beats::duration(Rational tempo) const
+Rational Period::duration(Rational tempo) const
 {
-    return beats / tempo * 60;
+    return wholeNotes / tempo * 60;
+}
+
+Rational AppState::Metronome::bpm()const{
+    return tempo * timeSignature.lower;
 }

@@ -73,7 +73,7 @@ struct AudioEngineImpl : public AudioEngine {
 
         if (state.metronome.on) {
             assert(metronomeBuffer.size() == numSamples);
-            metronome.generate(sampleRate, state.metronome.bpm, metronomeBuffer);
+            metronome.generate(sampleRate, boost::rational_cast<double>(state.metronome.bpm), metronomeBuffer);
             for (auto oc : outputChannels) {
                 elementWiseOperatorPlusEquals(span<float>(oc, numSamples), metronomeBuffer);
             }

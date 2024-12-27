@@ -14,7 +14,7 @@ constexpr double f6 = 1484.75;
 constexpr double f7 = 573.69;
 } // namespace
 
-void MetronomeGenerator::generate(double fs, float bpm, span<float> buf)
+void MetronomeGenerator::generate(double fs, double bpm, span<float> buf)
 {
     double beatInSec = 60.0 / bpm;
     double secPerSample = 1.0 / fs;

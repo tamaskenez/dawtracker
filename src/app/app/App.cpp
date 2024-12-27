@@ -215,7 +215,7 @@ struct AppImpl
               metronome.on = x.b;
           },
           [&](const msg::Metronome::BPM& x) {
-              metronome.bpm = x.bpm;
+              metronome.tempo = Rational(intFromFloat<int64_t>(round(100*x.bpm)/100)) / metronome.timeSignature.lower;
           }
         );
         fmt::println("appState.metronome: {}", reinterpret_cast<intptr_t>(&appState.metronome));
@@ -343,7 +343,7 @@ struct AppImpl
             rse.updateIfNeeded(appState.metronomeChanged);
             audioEngine->sendStateChangerFn([metronome = appState.metronome](AudioEngineState& s) {
                 s.metronome.on = metronome.on;
-                s.metronome.bpm = metronome.bpm;
+                s.metronome.bpm = metronome.bpm();
             });
         }
     }
