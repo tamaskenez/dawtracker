@@ -5,6 +5,41 @@
 #include "AudioClip.h"
 #include "audiodevicetypes.h"
 
+#include "boost/rational.hpp"
+using Rational = boost::rational<int64_t>;
+
+struct TimeSignature {
+    int upper, lower;
+};
+struct Bar {
+    TimeSignature timeSignature;
+    Rational duration(Rational tempo) const;
+};
+
+struct Bars {
+    vector<Bar> bars;
+    Rational duration(Rational tempo) const;
+};
+struct Beats {
+    Rational beats;
+    Rational duration(Rational tempo) const;
+};
+struct Duration {
+    Rational duration;
+};
+
+struct ArrangementSection {
+    string name;
+    optional<Rational> tempo;
+    variant<Bars, Beats, Duration> structure;
+
+    Rational duration(Rational defaultTempo) const;
+};
+
+struct Arrangement {
+    vector<ArrangementSection> sections;
+};
+
 struct AudioChannelPropertiesOnUI {
     string name;
     bool enabled;
@@ -12,6 +47,8 @@ struct AudioChannelPropertiesOnUI {
 };
 
 struct AppState {
+    AppState();
+
     struct AudioSettingsUI {
         vector<string> outputDeviceNames, inputDeviceNames;
         size_t selectedOutputDeviceIx = 0, selectedInputDeviceIx = 0;
@@ -44,4 +81,6 @@ struct AppState {
     optional<double> playedTime;
     optional<AudioClip> clipBeingRecorded;
     bool clipBeingPlayed = false;
+
+    Arrangement arrangement;
 };

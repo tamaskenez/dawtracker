@@ -52,7 +52,7 @@ struct UIImpl : public UI {
         ImGui::SetNextWindowSize(io.DisplaySize);
 
         ImGui::Begin(
-          "MainWindow...this is not displayed",
+          "MainWindow",
           nullptr,
           ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse
             | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings
@@ -90,13 +90,10 @@ struct UIImpl : public UI {
             avgDt = chr::duration<double>(sumDuration).count() / frameTimes.size();
             avgUIRefreshHz = (frameTimes.size() - 1) / chr::duration<double>(maxT - minT).count();
         }
-        ImGui::TextUnformatted(fmt::format(
-                                 "Average UI refresh: {:.2f} Hz, UI repaint time: {:.2f} ms (max {:.2f} ms)",
-                                 avgUIRefreshHz,
-                                 avgDt * 1000,
-                                 maxDt * 1000
-        )
-                                 .c_str());
+        ImGui::TextUnformatted(fmt::format("Average UI refresh: {:.2f} Hz", avgUIRefreshHz).c_str());
+        ImGui::TextUnformatted(
+          fmt::format("UI repaint time: {:.2f} ms (max {:.2f} ms)", avgDt * 1000, maxDt * 1000).c_str()
+        );
         ImGui::Checkbox("Demo Window",
                         &show_demo_window); // Edit bools storing our window open/close state
         bool on = rse.get(appState.metronome.on);
@@ -246,6 +243,73 @@ struct UIImpl : public UI {
             // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
+
+        ImGui::SetNextWindowPos(ImVec2(400, 0));
+        ImGui::SetNextWindowSize(ImVec2(400, io.DisplaySize.y));
+        ImGui::Begin(
+          "Arrangement",
+          nullptr,
+          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse
+            | ImGuiWindowFlags_NoSavedSettings
+        );
+
+        auto& arr = rse.get(appState.arrangement);
+        int sectionIx = 0;
+        constexpr float k_pixelsPerSeconds = 40.0f;
+        for (auto& a : arr.sections) {
+            auto defaultTempo = Rational(120);
+            auto secondsOfSection = boost::rational_cast<float>(a.duration(defaultTempo));
+            ImGui::BeginChild(
+              fmt::format("ArrangementSection{}", sectionIx++).c_str(),
+              ImVec2(ImGui::GetContentRegionAvail().x, secondsOfSection * k_pixelsPerSeconds),
+              ImGuiChildFlags_Borders,
+              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+            );
+            auto tempo = a.tempo.value_or(defaultTempo);
+            ImGui::TextUnformatted(fmt::format("name: {}, {} s", a.name, secondsOfSection).c_str());
+            const auto windowPos = ImGui::GetWindowPos();
+            switch_variant(
+              a.structure,
+              [&](const Bars& x) {
+                  float secondsInBars = 0;
+                  for (auto& b : x.bars) {
+                      ImGui::TextUnformatted(fmt::format("{}/{}", b.timeSignature.upper, b.timeSignature.lower).c_str()
+                      );
+                      const auto beatInSeconds = boost::rational_cast<float>(60 / tempo);
+                      bool firstInBar = true;
+                      for (UNUSED auto beatIxInBar : vi::iota(0, b.timeSignature.upper)) {
+                          auto y = secondsInBars * k_pixelsPerSeconds;
+                          if (firstInBar) {
+                              ImGui::GetWindowDrawList()->AddLine(
+                                windowPos + ImVec2(190, y), windowPos + ImVec2(210, y), IM_COL32_WHITE, 2
+                              );
+                              firstInBar = false;
+                          } else {
+                              ImGui::GetWindowDrawList()->AddCircleFilled(
+                                windowPos + ImVec2(200, y), 1, IM_COL32_WHITE
+                              );
+                          }
+                          secondsInBars += beatInSeconds;
+                      }
+                  }
+              },
+              [&](const Beats& x) {
+                  ImGui::TextUnformatted(fmt::format("{:.2f} beats", boost::rational_cast<float>(x.beats)).c_str());
+                  auto numWholeBeats = x.beats.numerator() / x.beats.denominator() + 1;
+                  for (int64_t i : vi::iota(0, numWholeBeats)) {
+                      auto y = boost::rational_cast<float>(Rational(i) / tempo * 60) * k_pixelsPerSeconds;
+                      ImGui::GetWindowDrawList()->AddCircleFilled(windowPos + ImVec2(200, y), 1, IM_COL32_WHITE);
+                  }
+              },
+              [](const Duration& x) {
+                  ImGui::TextUnformatted(fmt::format("{:.2f} seconds", boost::rational_cast<float>(x.duration)).c_str()
+                  );
+              }
+            );
+
+            ImGui::EndChild();
+        }
+        ImGui::End();
 
         // 3. Show another simple window.
         // if (show_another_window) {

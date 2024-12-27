@@ -26,6 +26,7 @@ find_package(freetype REQUIRED CONFIG)
 find_package(OpenGL REQUIRED)
 find_package(concurrentqueue REQUIRED)
 find_package(readerwriterqueue REQUIRED)
+find_package(Boost REQUIRED CONFIG)
 
 # IMGUI backend
 

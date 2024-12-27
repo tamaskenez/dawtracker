@@ -136,3 +136,11 @@ R clampCast(T t)
         }
     }
 }
+
+template<class R, class T>
+R floatCast(T t)
+{
+    static_assert(std::is_floating_point_v<R>, "The result type of floatCast should be floating point.");
+    static_assert(std::is_floating_point_v<T>, "Argument for floatCast should be floating point.");
+    return static_cast<R>(t);
+}

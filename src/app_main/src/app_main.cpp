@@ -22,7 +22,7 @@ namespace
 {
 constexpr auto k_minUIRefreshInterval = chr::milliseconds(50);
 constexpr auto k_maxUIRefreshInterval = chr::milliseconds(200);
-constexpr double k_refreshIntervalIncreaesFactorWhenNoEvents = 1.05;
+constexpr double k_refreshIntervalIncreaseFactorWhenNoEvents = 1.05;
 } // namespace
 
 //// This example doesn't compile with Emscripten yet! Awaiting SDL3 support.
@@ -167,7 +167,7 @@ int main(int, char**)
             targetRefreshInterval = k_minUIRefreshInterval;
         } else {
             targetRefreshInterval = std::min(
-              targetRefreshInterval * k_refreshIntervalIncreaesFactorWhenNoEvents,
+              targetRefreshInterval * k_refreshIntervalIncreaseFactorWhenNoEvents,
               chr::duration<double>(k_maxUIRefreshInterval)
             );
         }

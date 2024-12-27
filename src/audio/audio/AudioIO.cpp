@@ -82,7 +82,7 @@ struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
 
     void audioDeviceStopped() override
     {
-        sendToAppSync(MAKE_VARIANT_V(msg::AudioIO, AudioCallbacksStopped{}));
+        sendToApp(MAKE_VARIANT_V(msg::AudioIO, AudioCallbacksStopped{}));
     }
 
     void audioDeviceError(const juce::String& errorMessage) override

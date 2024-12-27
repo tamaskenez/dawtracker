@@ -11,4 +11,5 @@ target_link_libraries(common
 		absl::log
 		absl::log_initialize
 		fmt::fmt
+		Boost::headers
 )
