@@ -261,7 +261,7 @@ struct AppImpl
         auto clipBeingRecordedBorrow = rse.borrowThenSet(appState.clipBeingRecorded);
         CHECK(clipBeingRecordedBorrow->has_value());
         audioEngine->stopRecording();
-        rse.borrowThenSet(appState.clips)->insert(pair(appState.makeId<AudioClip>(), MOVE(**clipBeingRecordedBorrow)));
+        rse.borrowThenSet(appState.clips)->insert(pair(Id<AudioClip>::make(), MOVE(**clipBeingRecordedBorrow)));
         rse.set(appState.clipBeingRecorded, nullopt);
         rse.set(appState.clipBeingRecordedSeconds, nullopt);
     }

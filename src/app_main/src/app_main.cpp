@@ -146,8 +146,6 @@ int main(int, char**)
             if (event.type == appQueueNotificationSdlEventType()) {
                 tryDequeueAndMakeAppReceiveIt();
             } else {
-                static int counter = 0;
-                fmt::println("sdl event {} {}", event.type, counter++);
                 ImGui_ImplSDL3_ProcessEvent(&event);
                 if (event.type == SDL_EVENT_QUIT) {
                     done = true;

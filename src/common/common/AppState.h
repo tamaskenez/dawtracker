@@ -64,12 +64,7 @@ struct AudioChannelPropertiesOnUI {
 
 struct AppState {
     AppState();
-    template<class T>
-    Id<T> makeId()
-    {
-        return Id<T>(nextId++);
-    }
-    uint64_t nextId = 1;
+
     struct AudioSettingsUI {
         vector<string> outputDeviceNames, inputDeviceNames;
         size_t selectedOutputDeviceIx = 0, selectedInputDeviceIx = 0;
