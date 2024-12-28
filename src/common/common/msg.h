@@ -1,6 +1,9 @@
 #pragma once
 
 #include "RecordingBuffer.h"
+#include "common/Id.h"
+
+struct AudioClip;
 
 namespace msg
 {
@@ -61,7 +64,7 @@ struct OutputChanged {
     bool enabled;
 };
 struct PlayClip {
-    size_t i;
+    Id<AudioClip> id;
 };
 namespace AudioEngine
 {

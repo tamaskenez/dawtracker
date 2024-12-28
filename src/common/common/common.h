@@ -6,10 +6,10 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
+#include "boost/rational.hpp"
 #include "fmt/format.h"
 #include "fmt/ranges.h"
 #include "fmt/std.h"
-#include "boost/rational.hpp"
 
 #define MOVE(X) std::move(X)
 
@@ -149,7 +149,8 @@ R floatCast(T t)
 }
 
 template<class R, class T>
-R intFromFloat(T t){
+R intFromFloat(T t)
+{
     static_assert(std::is_integral_v<R>, "The result type of intFromFloat should be integer.");
     static_assert(std::is_floating_point_v<T>, "Argument for intFromFloat should be floating point.");
     assert(static_cast<T>(std::numeric_limits<R>::min()) <= t && t <= static_cast<T>(std::numeric_limits<R>::max()));

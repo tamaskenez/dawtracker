@@ -215,7 +215,8 @@ struct AppImpl
               metronome.on = x.b;
           },
           [&](const msg::Metronome::BPM& x) {
-              metronome.tempo = Rational(intFromFloat<int64_t>(round(100*x.bpm)/100)) / metronome.timeSignature.lower;
+              metronome.tempo =
+                Rational(intFromFloat<int64_t>(round(100 * x.bpm) / 100)) / metronome.timeSignature.lower;
           }
         );
         fmt::println("appState.metronome: {}", reinterpret_cast<intptr_t>(&appState.metronome));
@@ -260,7 +261,7 @@ struct AppImpl
         auto clipBeingRecordedBorrow = rse.borrowThenSet(appState.clipBeingRecorded);
         CHECK(clipBeingRecordedBorrow->has_value());
         audioEngine->stopRecording();
-        rse.borrowThenSet(appState.clips)->push_back(MOVE(**clipBeingRecordedBorrow));
+        rse.borrowThenSet(appState.clips)->insert(pair(appState.makeId<AudioClip>(), MOVE(**clipBeingRecordedBorrow)));
         rse.set(appState.clipBeingRecorded, nullopt);
         rse.set(appState.clipBeingRecordedSeconds, nullopt);
     }
@@ -300,12 +301,11 @@ struct AppImpl
         );
         NOP;
     }
-    void playClip(size_t i)
+    void playClip(Id<AudioClip> id)
     {
         auto& clips = rse.get(appState.clips);
-        CHECK(i < clips.size());
         rse.set(appState.clipBeingPlayed, true);
-        audioEngine->play(AudioClip(clips[i]));
+        audioEngine->play(AudioClip(clips.at(id)));
     }
     void receive(std::any&& msg) override
     {
@@ -334,7 +334,7 @@ struct AppImpl
         } else if (auto* g = std::any_cast<msg::AudioEngine::V>(&msg)) {
             receiveAudioEngine(*g);
         } else if (auto* i = std::any_cast<msg::PlayClip>(&msg)) {
-            playClip(i->i);
+            playClip(i->id);
         } else {
             LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
         }

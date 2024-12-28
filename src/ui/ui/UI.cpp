@@ -44,7 +44,7 @@ struct UIImpl : public UI {
 
     void render() override
     {
-const        auto& metronome = rse.get(appState.metronome);
+        const auto& metronome = rse.get(appState.metronome);
 
         ImGuiIO& io = ImGui::GetIO();
 
@@ -170,11 +170,11 @@ const        auto& metronome = rse.get(appState.metronome);
         }
 
         auto& clips = rse.get(appState.clips);
-        for (size_t i : vi::iota(0u, clips.size())) {
-            ImGui::TextUnformatted(fmt::format("Clip #{}", i).c_str());
+        for (auto& [id, clip] : clips) {
+            ImGui::TextUnformatted(fmt::format("Clip #{}", id.v).c_str());
             ImGui::SameLine(150.0f);
-            if (ImGui::Button(fmt::format("Play##{}", i).c_str())) {
-                sendToApp(msg::PlayClip{i});
+            if (ImGui::Button(fmt::format("Play##{}", id.v).c_str())) {
+                sendToApp(msg::PlayClip{id});
             }
         }
 
@@ -255,22 +255,24 @@ const        auto& metronome = rse.get(appState.metronome);
             | ImGuiWindowFlags_NoSavedSettings
         );
 
-        auto& arr = rse.get(appState.arrangement);
+        auto& sections = rse.get(appState.sections);
+        auto& sectionOrder = rse.get(appState.sectionOrder);
         int sectionIx = 0;
         constexpr float k_pixelsPerSeconds = 40.0f;
-        for (auto& a : arr.sections) {
-            auto secondsOfSection = boost::rational_cast<float>(a.duration(metronome.tempo));
+        for (auto& sectionId : sectionOrder) {
+            auto& section = sections.at(sectionId);
+            auto secondsOfSection = boost::rational_cast<float>(section.duration(metronome.tempo));
             ImGui::BeginChild(
               fmt::format("ArrangementSection{}", sectionIx++).c_str(),
               ImVec2(ImGui::GetContentRegionAvail().x, secondsOfSection * k_pixelsPerSeconds),
               ImGuiChildFlags_Borders,
               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
             );
-            auto tempo = a.tempo.value_or(metronome.tempo);
-            ImGui::TextUnformatted(fmt::format("name: {}, {} s", a.name, secondsOfSection).c_str());
+            auto tempo = section.tempo.value_or(metronome.tempo);
+            ImGui::TextUnformatted(fmt::format("name: {}, {} s", section.name, secondsOfSection).c_str());
             const auto windowPos = ImGui::GetWindowPos();
             switch_variant(
-              a.structure,
+              section.structure,
               [&](const Bars& x) {
                   float secondsInBars = 0;
                   for (auto& b : x.bars) {
@@ -295,16 +297,18 @@ const        auto& metronome = rse.get(appState.metronome);
                   }
               },
               [&](const Period& x) {
-                  ImGui::TextUnformatted(fmt::format("{:.2f} whole notes", boost::rational_cast<float>(x.wholeNotes)).c_str());
-                  auto numWholeBeats = (x.wholeNotes.numerator() * metronome.timeSignature.lower) / x.wholeNotes.denominator() + 1;
+                  ImGui::TextUnformatted(
+                    fmt::format("{:.2f} whole notes", boost::rational_cast<float>(x.wholeNotes)).c_str()
+                  );
+                  auto numWholeBeats =
+                    (x.wholeNotes.numerator() * metronome.timeSignature.lower) / x.wholeNotes.denominator() + 1;
                   for (int64_t i : vi::iota(0, numWholeBeats)) {
                       auto y = boost::rational_cast<float>(Rational(i) / tempo * 60) * k_pixelsPerSeconds;
                       ImGui::GetWindowDrawList()->AddCircleFilled(windowPos + ImVec2(200, y), 1, IM_COL32_WHITE);
                   }
               },
               [](const Duration& x) {
-                  ImGui::TextUnformatted(fmt::format("{:.2f} seconds", boost::rational_cast<float>(x.seconds)).c_str()
-                  );
+                  ImGui::TextUnformatted(fmt::format("{:.2f} seconds", boost::rational_cast<float>(x.seconds)).c_str());
               }
             );
 

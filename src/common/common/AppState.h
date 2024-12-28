@@ -1,13 +1,13 @@
 #pragma once
 
-#include "common.h"
-
 #include "AudioClip.h"
+#include "Id.h"
 #include "audiodevicetypes.h"
+#include "common.h"
 
 struct TimeSignature {
     int upper, lower;
-    bool    operator==(const TimeSignature&)const=default;
+    bool operator==(const TimeSignature&) const = default;
 };
 struct Bar {
     TimeSignature timeSignature;
@@ -27,16 +27,33 @@ struct Duration {
     Rational seconds;
 };
 
-struct ArrangementSection {
+struct Section;
+
+enum class TimeUnit {
+    wholeNotes,
+    seconds
+};
+
+// AudioClip linked into an Arrangement section.
+struct ClipLink {
+    Id<Section> sectionId;
+    Id<AudioClip> audioClipId;
+    TimeUnit timeUnit; // For start
+    Rational clipOriginToSectionStart;
+};
+
+struct Section {
     string name;
     optional<Rational> tempo;
     variant<Bars, Period, Duration> structure;
+    vector<ClipLink> clipLinksAnchored;
+    vector<ClipLink> clipLinksOverlapping;
 
     Rational duration(Rational defaultTempo) const;
 };
 
-struct Arrangement {
-    vector<ArrangementSection> sections;
+struct Track {
+    string name;
 };
 
 struct AudioChannelPropertiesOnUI {
@@ -47,7 +64,12 @@ struct AudioChannelPropertiesOnUI {
 
 struct AppState {
     AppState();
-
+    template<class T>
+    Id<T> makeId()
+    {
+        return Id<T>(nextId++);
+    }
+    uint64_t nextId = 1;
     struct AudioSettingsUI {
         vector<string> outputDeviceNames, inputDeviceNames;
         size_t selectedOutputDeviceIx = 0, selectedInputDeviceIx = 0;
@@ -60,9 +82,9 @@ struct AppState {
 
     struct Metronome {
         bool on = false;
-        Rational tempo {120,4};
-        TimeSignature timeSignature = TimeSignature{4,4};
-        Rational bpm()const;
+        Rational tempo{120, 4}; // Whole notes per minute.
+        TimeSignature timeSignature = TimeSignature{4, 4};
+        Rational bpm() const;
         bool operator==(const Metronome&) const = default;
     } metronome;
 
@@ -73,7 +95,6 @@ struct AppState {
     vector<AudioChannelPropertiesOnUI> outputs;
 
     ActiveAudioDevices activeAudioDevices;
-    vector<AudioClip> clips;
 
     monostate anyVariableDisplayedOnUIChanged;
     monostate metronomeChanged;
@@ -83,5 +104,11 @@ struct AppState {
     optional<AudioClip> clipBeingRecorded;
     bool clipBeingPlayed = false;
 
-    Arrangement arrangement;
+    unordered_map<Id<AudioClip>, AudioClip> clips;
+    unordered_map<Id<Section>, Section> sections;
+    vector<Id<Section>> sectionOrder;
+    unordered_map<Id<Track>, Track> tracks;
+    vector<Id<Track>> trackOrder;
+
+    unordered_map<Id<ClipLink>, ClipLink> clipLinks;
 };
