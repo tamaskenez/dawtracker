@@ -73,7 +73,7 @@ struct AudioIODeviceCallback : public juce::AudioIODeviceCallback {
     }
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
     {
-        sendToAppSync(msg::AudioIO::V(msg::AudioIO::AudioCallbacksAboutToStart{
+        sendToApp(msg::AudioIO::V(msg::AudioIO::AudioCallbacksAboutToStart{
           .sampleRate = device->getCurrentSampleRate(),
           .bufferSize = size_t(device->getCurrentBufferSizeSamples()),
           .numInputChannels = size_t(device->getActiveInputChannels().countNumberOfSetBits())

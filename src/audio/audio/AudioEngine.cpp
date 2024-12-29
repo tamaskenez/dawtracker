@@ -66,7 +66,7 @@ struct AudioEngineImpl : public AudioEngine {
             std::fill(oc, oc + numSamples, 0);
         }
         if (!audioCallbacksRunning) {
-            assert(false);
+            LOG(WARNING) << "Called while not running.";
             return;
         }
         processMainToCallbackThreadQueue();
