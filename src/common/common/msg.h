@@ -12,6 +12,8 @@ enum class MainMenu {
     settings,
     hideSettings
 };
+struct AddTrack {
+};
 
 namespace AudioSettings
 {

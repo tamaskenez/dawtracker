@@ -54,6 +54,7 @@ struct Section {
 
 struct Track {
     string name;
+    bool operator==(const Track&) const = default;
 };
 
 struct AudioChannelPropertiesOnUI {
@@ -102,6 +103,7 @@ struct AppState {
     unordered_map<Id<AudioClip>, AudioClip> clips;
     unordered_map<Id<Section>, Section> sections;
     vector<Id<Section>> sectionOrder;
+    int nextNewTrackId = 1;
     unordered_map<Id<Track>, Track> tracks;
     vector<Id<Track>> trackOrder;
 

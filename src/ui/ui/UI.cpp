@@ -103,6 +103,7 @@ struct UIImpl : public UI {
             sendToApp(MAKE_VARIANT_V(msg::Metronome, On{on}));
         }
         float bpm = boost::rational_cast<float>(metronome.bpm());
+        ImGui::SetNextItemWidth(200.0f);
         if (ImGui::SliderFloat("BPM", &bpm, 32, 320, "%.1f", ImGuiSliderFlags_AlwaysClamp)) {
             sendToApp(MAKE_VARIANT_V(msg::Metronome, BPM{bpm}));
         }
@@ -167,6 +168,9 @@ struct UIImpl : public UI {
         }
         if (!rse.get(appState.playButtonEnabled)) {
             ImGui::EndDisabled();
+        }
+        if (ImGui::Button("Add track")) {
+            sendToApp(msg::AddTrack{});
         }
 
         auto& clips = rse.get(appState.clips);
@@ -246,8 +250,12 @@ struct UIImpl : public UI {
             ImGui::End();
         }
 
-        ImGui::SetNextWindowPos(ImVec2(400, 0));
-        ImGui::SetNextWindowSize(ImVec2(400, io.DisplaySize.y));
+        constexpr int k_arrangementX = 300;
+        constexpr int k_arrangementWidth = 200;
+        constexpr float k_pixelsPerSeconds = 40.0f;
+        constexpr int k_beatMarkersX = 150;
+        ImGui::SetNextWindowPos(ImVec2(k_arrangementX, 0));
+        ImGui::SetNextWindowSize(ImVec2(k_arrangementWidth, io.DisplaySize.y));
         ImGui::Begin(
           "Arrangement",
           nullptr,
@@ -258,7 +266,6 @@ struct UIImpl : public UI {
         auto& sections = rse.get(appState.sections);
         auto& sectionOrder = rse.get(appState.sectionOrder);
         int sectionIx = 0;
-        constexpr float k_pixelsPerSeconds = 40.0f;
         for (auto& sectionId : sectionOrder) {
             auto& section = sections.at(sectionId);
             auto secondsOfSection = boost::rational_cast<float>(section.duration(metronome.tempo));
@@ -284,12 +291,15 @@ struct UIImpl : public UI {
                           auto y = secondsInBars * k_pixelsPerSeconds;
                           if (firstInBar) {
                               ImGui::GetWindowDrawList()->AddLine(
-                                windowPos + ImVec2(190, y), windowPos + ImVec2(210, y), IM_COL32_WHITE, 2
+                                windowPos + ImVec2(k_beatMarkersX - 10, y),
+                                windowPos + ImVec2(k_beatMarkersX + 10, y),
+                                IM_COL32_WHITE,
+                                2
                               );
                               firstInBar = false;
                           } else {
                               ImGui::GetWindowDrawList()->AddCircleFilled(
-                                windowPos + ImVec2(200, y), 1, IM_COL32_WHITE
+                                windowPos + ImVec2(k_beatMarkersX, y), 1, IM_COL32_WHITE
                               );
                           }
                           secondsInBars += beatInSeconds;
@@ -304,7 +314,9 @@ struct UIImpl : public UI {
                     (x.wholeNotes.numerator() * metronome.timeSignature.lower) / x.wholeNotes.denominator() + 1;
                   for (int64_t i : vi::iota(0, numWholeBeats)) {
                       auto y = boost::rational_cast<float>(Rational(i) / tempo * 60) * k_pixelsPerSeconds;
-                      ImGui::GetWindowDrawList()->AddCircleFilled(windowPos + ImVec2(200, y), 1, IM_COL32_WHITE);
+                      ImGui::GetWindowDrawList()->AddCircleFilled(
+                        windowPos + ImVec2(k_beatMarkersX, y), 1, IM_COL32_WHITE
+                      );
                   }
               },
               [](const Duration& x) {
@@ -316,6 +328,27 @@ struct UIImpl : public UI {
         }
         ImGui::End();
 
+        constexpr int k_tracksWidth = 400;
+        constexpr int k_trackWidth = 100;
+        ImGui::SetNextWindowPos(ImVec2(k_arrangementX + k_arrangementWidth, 0));
+        ImGui::SetNextWindowSize(ImVec2(k_tracksWidth, io.DisplaySize.y));
+        ImGui::Begin(
+          "Tracks",
+          nullptr,
+          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse
+            | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_HorizontalScrollbar
+        );
+        ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.0f));
+        int ix = 0;
+        auto y0 = ImGui::GetCursorPosY();
+        for (auto& trackId : rse.get(appState.trackOrder)) {
+            auto& track = rse.get(appState.tracks).at(trackId);
+            ImGui::SetCursorPos(ImVec2(ix * k_trackWidth, y0));
+            ImGui::Selectable(track.name.c_str(), false, 0, ImVec2(k_trackWidth, 15));
+            ++ix;
+        }
+        ImGui::PopStyleVar();
+        ImGui::End();
         // 3. Show another simple window.
         // if (show_another_window) {
         //    ImGui::Begin(

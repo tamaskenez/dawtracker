@@ -109,7 +109,6 @@ struct AppImpl
           appState.outputs,
           appState.clips
         );
-        fmt::println("appState.metronome: {}", reinterpret_cast<intptr_t>(&appState.metronome));
         rse.registerUpdater(
           appState.metronomeChanged,
           []() {
@@ -219,7 +218,6 @@ struct AppImpl
                 Rational(intFromFloat<int64_t>(round(100 * x.bpm) / 100)) / metronome.timeSignature.lower;
           }
         );
-        fmt::println("appState.metronome: {}", reinterpret_cast<intptr_t>(&appState.metronome));
         rse.set(appState.metronome, MOVE(metronome));
     }
 
@@ -307,6 +305,17 @@ struct AppImpl
         rse.set(appState.clipBeingPlayed, true);
         audioEngine->play(AudioClip(clips.at(id)));
     }
+    void addTrack()
+    {
+        auto id = Id<Track>::make();
+        auto name = fmt::format("New track #{}", appState.nextNewTrackId++);
+        auto tracks = rse.get(appState.tracks);
+        CHECK(tracks.insert(pair(id, Track{MOVE(name)})).second);
+        rse.set(appState.tracks, MOVE(tracks));
+        auto trackOrder = appState.trackOrder;
+        trackOrder.push_back(id);
+        rse.set(appState.trackOrder, MOVE(trackOrder));
+    }
     void receive(std::any&& msg) override
     {
         if (auto* a = std::any_cast<msg::MainMenu>(&msg)) {
@@ -335,6 +344,8 @@ struct AppImpl
             receiveAudioEngine(*g);
         } else if (auto* i = std::any_cast<msg::PlayClip>(&msg)) {
             playClip(i->id);
+        } else if (auto* j = std::any_cast<msg::AddTrack>(&msg)) {
+            addTrack();
         } else {
             LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
         }
