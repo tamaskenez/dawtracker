@@ -24,5 +24,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 		/w14928      # Illegal copy-initialization; applied more than one user-defined conversion.
 		/w15038      # Warns when member variables are initialized in a different order than declared.
 		/W4          # Enable level 4 warnings.
+		/wd4324      # structure was padded due to alignment specifier
 	)
 endif()

@@ -13,5 +13,5 @@ uint64_t getNextUniqueU64()
     pair<uint64_t, uint64_t> u64pair;
     static_assert(sizeof(u64pair) == 16);
     std::copy(uuid.begin(), uuid.end(), reinterpret_cast<uint8_t*>(&u64pair));
-    return u64pair.first ^ u64pair.second ^ static_cast<uint64_t>(std::hash<std::thread::id>{}(expectedThreadId));
+    return u64pair.first ^ u64pair.second ^ std::hash<std::thread::id>{}(expectedThreadId);
 }

@@ -12,7 +12,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		-Wdisabled-optimization     # GCC’s optimizers are unable to handle the code effectively.
 		-Wduplicated-branches       # Warn about duplicated branches in if-else statements.
 		-Wduplicated-cond           # Warn about duplicated conditions in an if-else-if chain.
-		-Weffc++                    # Warnings related to guidelines from Scott Meyers’ Effective C++ books.
 		-Wextra                     # Enables an extra set of warnings.
 		-Wextra-semi                # Redundant semicolons after in-class function definitions.
 		-Wformat=2                  # printf/scanf/strftime/strfmon format string anomalies.

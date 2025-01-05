@@ -4,15 +4,18 @@
 
 enum class Platform {
     mac,
-    win
+    win,
+    linux
 };
 
 inline Platform getPlatform()
 {
 #if defined _WIN32
     return Platform::win;
-#elif __APPLE__
+#elifdef __APPLE__
     return Platform::mac;
+#elifdef __LINUX__
+    return Platform::linux;
 #else
   #error
 #endif

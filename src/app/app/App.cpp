@@ -59,7 +59,7 @@ struct AppImpl
     AppImpl(UI* uiArg, AppState& appStateArg)
         : AppCtx(uiArg, appStateArg)
     {
-        println("main thread: {}", this_thread::get_id());
+        fmt::println("main thread: {}", this_thread::get_id());
         audioIO->setAudioCallback([audioEngine_ = audioEngine.get()](
                                     span<const float*> inputChannels, span<float*> outputChannels, size_t numSamples
                                   ) {

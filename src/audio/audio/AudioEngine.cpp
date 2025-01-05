@@ -59,11 +59,10 @@ struct AudioEngineImpl : public AudioEngine {
     }
 
     // Called on the audio callback thread.
-    void process(UNUSED span<const float*> inputChannels, UNUSED span<float*> outputChannels, UNUSED size_t numSamples)
-      override
+    void process(span<const float*> inputChannels, span<float*> outputChannels, size_t numSamples) override
     {
         for (auto oc : outputChannels) {
-            std::fill(oc, oc + numSamples, 0);
+            std::fill(oc, oc + numSamples, 0.0f);
         }
         if (!audioCallbacksRunning) {
             LOG(WARNING) << "Called while not running.";

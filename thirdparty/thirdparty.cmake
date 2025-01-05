@@ -53,18 +53,12 @@ endforeach()
 
 file(COPY_FILE ${CMAKE_CURRENT_LIST_DIR}/imgui/CMakeLists.txt ${BUILD_DIR}/IMGUI/s/CMakeLists.txt)
 
+set(build_types Debug Release)
+if(DEFINED ENV{BUILD_TYPES})
+    set(build_types $ENV{BUILD_TYPES})
+endif()
 foreach(project IN LISTS PROJECTS)
-    foreach(config Debug Release)
-        if(project STREQUAL "GOOGLE_CLOUD_CPP")
-            set(s ${CMAKE_CURRENT_LIST_DIR}/protobuf_include_dir)
-            set(b ${BUILD_DIR}/protobuf_include_dir/${config})
-            cmake(-S ${s} -B ${b}
-                -D CMAKE_BUILD_TYPE=${config}
-                -D CMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}
-            )
-            file(READ ${b}/protobuf_INCLUDE_DIR protobuf_INCLUDE_DIR)
-            message(STATUS "protobuf_INCLUDE_DIR: \"${protobuf_INCLUDE_DIR}\"")
-        endif()
+    foreach(config IN LISTS build_types)
         set(s ${BUILD_DIR}/${project}/s)
         set(b ${BUILD_DIR}/${project}/${config})
         message(STATUS "[${project}]: calling cmake-config ${config}")
@@ -78,6 +72,26 @@ foreach(project IN LISTS PROJECTS)
             -D CMAKE_CXX_STANDARD_REQUIRED=1
             -D CMAKE_FIND_PACKAGE_PREFER_CONFIG=1
             -D BUILD_TESTING=0
+            -D JUCE_USE_CURL=0
+            -D JUCE_USE_FONTCONFIG=0
+            -D JUCE_USE_FREETYPE=0
+            -D JUCE_USE_XCURSOR=0
+            -D JUCE_USE_XINERAMA=0
+            -D JUCE_USE_XRANDR=0
+            -D JUCE_USE_XRENDER=0
+            -D JUCE_WEB_BROWSER=0
+            -D SDL_AUDIO=0
+            -D SDL_CAMERA=0
+            -D SDL_DIRECTX=0
+            -D SDL_HAPTIC=0
+            -D SDL_HIDAPI=0
+            -D SDL_JOYSTICK=0
+            -D SDL_OPENGLES=0
+            -D SDL_POWER=0
+            -D SDL_SENSOR=0
+            -D SDL_VULKAN=0
+            -D SDL_WASAPI=0
+            -D SDL_XINPUT=0
         )
         message(STATUS "[${project}]: calling cmake-build ${config}")
         cmake(--build ${b} --target install --config ${config} -j)

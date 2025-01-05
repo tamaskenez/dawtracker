@@ -24,6 +24,7 @@ string makeMenuShortcutString(string_view s)
         prefix = "⌘";
         break;
     case Platform::win:
+    case Platform::linux:
         prefix = "Ctrl+";
         break;
     }
@@ -339,7 +340,7 @@ struct UIImpl : public UI {
         auto y0 = ImGui::GetCursorPosY();
         for (auto& trackId : rse.get(appState.trackOrder)) {
             auto& track = rse.get(appState.tracks).at(trackId);
-            ImGui::SetCursorPos(ImVec2(ix * k_trackWidth, y0));
+            ImGui::SetCursorPos(ImVec2(floatFromInt<float>(ix) * k_trackWidth, y0));
             ImGui::Selectable(track.name.c_str(), false, 0, ImVec2(k_trackWidth, 15));
             ++ix;
         }

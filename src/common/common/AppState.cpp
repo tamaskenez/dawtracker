@@ -23,11 +23,27 @@ AppState::AppState()
     auto ts88 = TimeSignature{8, 8};
     auto ts44 = TimeSignature{4, 4};
     auto ts34 = TimeSignature{3, 4};
-    auto v1 =
-      Section{.name = "Verse 1", .structure = Bars{.bars = {Bar{.timeSignature = ts44}, Bar{.timeSignature = ts88}}}};
-    auto v2 =
-      Section{.name = "Verse 2", .structure = Bars{.bars = {Bar{.timeSignature = ts44}, Bar{.timeSignature = ts34}}}};
-    auto ch = Section{.name = "Chorus", .structure = Bars{.bars = {Bar{.timeSignature = ts44}}}};
+    auto v1 = Section{
+      .name = "Verse 1",
+      .tempo = {},
+      .structure = Bars{.bars = {Bar{.timeSignature = ts44}, Bar{.timeSignature = ts88}}},
+      .clipLinksAnchored = {},
+      .clipLinksOverlapping = {}
+    };
+    auto v2 = Section{
+      .name = "Verse 2",
+      .tempo = {},
+      .structure = Bars{.bars = {Bar{.timeSignature = ts44}, Bar{.timeSignature = ts34}}},
+      .clipLinksAnchored = {},
+      .clipLinksOverlapping = {}
+    };
+    auto ch = Section{
+      .name = "Chorus",
+      .tempo = {},
+      .structure = Bars{.bars = {Bar{.timeSignature = ts44}}},
+      .clipLinksAnchored = {},
+      .clipLinksOverlapping = {}
+    };
     for (auto& s : {v1, v2, ch}) {
         auto id = Id<Section>::make();
         rse.insert(sections, pair(id, MOVE(s)));

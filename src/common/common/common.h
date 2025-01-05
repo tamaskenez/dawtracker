@@ -97,6 +97,7 @@ auto switch_variant(Variant&& variant, Ts&&... ts)
     return std::visit(overloaded{std::forward<Ts>(ts)...}, std::forward<Variant>(variant));
 }
 
+// intCast is static_cast intX -> intY with an assert to check if it's out of range.
 template<class R, class T>
 R intCast(T t)
 {
@@ -113,6 +114,7 @@ R intCast(T t)
     }
 }
 
+// intCast is static_cast intX -> intY if lossless, otherwise clamps to target range.
 template<class R, class T>
 R clampCast(T t)
 {
@@ -140,6 +142,7 @@ R clampCast(T t)
     }
 }
 
+// floatCast is just an expressive name for floatX -> floatY static cast.
 template<class R, class T>
 R floatCast(T t)
 {
@@ -148,12 +151,22 @@ R floatCast(T t)
     return static_cast<R>(t);
 }
 
+// intFromFloat is a static cast floatX -> intX with an assert checking if it's in range for the target.
 template<class R, class T>
 R intFromFloat(T t)
 {
     static_assert(std::is_integral_v<R>, "The result type of intFromFloat should be integer.");
     static_assert(std::is_floating_point_v<T>, "Argument for intFromFloat should be floating point.");
     assert(static_cast<T>(std::numeric_limits<R>::min()) <= t && t <= static_cast<T>(std::numeric_limits<R>::max()));
+    return static_cast<R>(t);
+}
+
+// floatFromInt is a static cast intX -> floatY
+template<class R, class T>
+R floatFromInt(T t)
+{
+    static_assert(std::is_floating_point_v<R>, "The result type of floatFromInt should be floating point.");
+    static_assert(std::is_integral_v<T>, "Argument for floatFromInt should be integer.");
     return static_cast<R>(t);
 }
 

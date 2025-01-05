@@ -126,12 +126,21 @@ class ScopedUndoables
 {
     friend class ::ReactiveStateEngine;
     ::ReactiveStateEngine* that;
-    ScopedUndoables(::ReactiveStateEngine* thatArg)
+    explicit ScopedUndoables(::ReactiveStateEngine* thatArg)
         : that(thatArg)
     {
     }
 
 public:
+    ScopedUndoables(const ScopedUndoables&) = delete;
+    void operator=(const ScopedUndoables&) = delete;
+
+    ScopedUndoables(ScopedUndoables&& y)
+        : that(y.that)
+    {
+        y.that = nullptr;
+    }
+
     ~ScopedUndoables();
 };
 
@@ -292,8 +301,6 @@ public:
 private:
     friend class rse::ScopedUndoables;
 
-    optional<vector<rse::UpstreamNode>> inputCollectorDuringRegistration;
-    uint64_t nextTimestamp = 1; // timestamp = 0 means uninitialized
     struct UndoRedoNodeBase {
         // Not sure if it'll ever matter but execute undoOps in reverse order.
         vector<pair<function<void()>, function<void()>>> undoRedoOps;
@@ -312,6 +319,9 @@ private:
         explicit UndoRedoNode(UndoRedoNodeBase base);
         UndoRedoNode(function<void()> undoFn, function<void()> redoFn);
     };
+
+    optional<vector<rse::UpstreamNode>> inputCollectorDuringRegistration;
+    uint64_t nextTimestamp = 1; // timestamp = 0 means uninitialized
     optional<UndoRedoNodeBase> undoablesCollector;
     deque<UndoRedoNode> undoRedoHistory;
     deque<UndoRedoNode>::iterator nextNodeToRedo = undoRedoHistory.end();

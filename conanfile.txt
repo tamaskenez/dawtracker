@@ -1,5 +1,5 @@
 [requires]
-fmt/11.0.2
+fmt/11.1.1
 gtest/1.15.0
 abseil/20240722.0
 freetype/2.13.3

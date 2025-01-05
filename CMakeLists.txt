@@ -18,7 +18,7 @@ endif()
 
 find_package(fmt REQUIRED CONFIG)
 find_package(absl REQUIRED CONFIG)
-find_package(gtest REQUIRED CONFIG)
+# find_package(GTest REQUIRED CONFIG)
 find_package(JUCE REQUIRED CONFIG)
 find_package(imgui REQUIRED CONFIG)
 find_package(SDL3 REQUIRED CONFIG)
