@@ -5,7 +5,6 @@
 #include "audio/AudioIO.h"
 #include "common/AppState.h"
 #include "common/MetronomeGenerator.h"
-#include "common/ReactiveStateEngine.h"
 #include "common/msg.h"
 #include "platform/platform.h"
 #include "ui/UI.h"
@@ -57,8 +56,8 @@ AppState::AudioSettingsUI makeAudioSettingsUI(const vector<AudioDeviceProperties
 struct AppImpl
     : public App
     , public AppCtx {
-    AppImpl(UI* uiArg, AppState& appStateArg, ReactiveStateEngine& rseArg)
-        : AppCtx(uiArg, appStateArg, rseArg)
+    AppImpl(UI* uiArg, AppState& appStateArg)
+        : AppCtx(uiArg, appStateArg)
     {
         println("main thread: {}", this_thread::get_id());
         audioIO->setAudioCallback([audioEngine_ = audioEngine.get()](
@@ -71,13 +70,9 @@ struct AppImpl
             return makeAudioSettingsUI(audioIO->getAudioDevices(), rse.get(appState.activeAudioDevices));
         });
         rse.registerUpdater(appState.playButtonEnabled, [this]() {
-            return rse.get(appState.activeAudioDevices.outputDevice).has_value() && !rse.get(appState.clips).empty()
+            return rse.get(appState.activeAudioDevices).outputDevice.has_value() && !rse.get(appState.clips).empty()
                 && !rse.get(appState.clipBeingRecorded);
         });
-        rse.registerUpdater(appState.playButton, [this]() {
-            return rse.get(appState.clipBeingPlayed);
-        });
-
         rse.registerUpdater(appState.recordButtonEnabled, [this]() {
             return rse.get(appState.activeAudioDevices).canRecord() && !rse.get(appState.clipBeingRecorded)
                 && !rse.get(appState.clipBeingPlayed);
@@ -104,7 +99,6 @@ struct AppImpl
           appState.playButtonEnabled,
           appState.recordButton,
           appState.stopButton,
-          appState.playButton,
           appState.inputs,
           appState.outputs,
           appState.clips
@@ -151,6 +145,7 @@ struct AppImpl
             sendQuitEventToAppMain();
             break;
         case msg::MainMenu::settings:
+            rse.set(appState.activeAudioDevices, audioIO->getActiveAudioDevices());
             rse.set(appState.showAudioSettings, true);
             break;
         case msg::MainMenu::hideSettings:
@@ -256,11 +251,10 @@ struct AppImpl
 
     void stopRecording()
     {
-        auto clipBeingRecordedBorrow = rse.borrowThenSet(appState.clipBeingRecorded);
-        CHECK(clipBeingRecordedBorrow->has_value());
         audioEngine->stopRecording();
-        rse.borrowThenSet(appState.clips)->insert(pair(Id<AudioClip>::make(), MOVE(**clipBeingRecordedBorrow)));
-        rse.set(appState.clipBeingRecorded, nullopt);
+        CHECK(rse.get(appState.clipBeingRecorded).has_value());
+        auto clipBeingRecorded = rse.exchange(appState.clipBeingRecorded, nullopt).value();
+        CHECK(rse.insert(appState.clips, pair(Id<AudioClip>::make(), MOVE(clipBeingRecorded))).second);
         rse.set(appState.clipBeingRecordedSeconds, nullopt);
     }
 
@@ -274,24 +268,25 @@ struct AppImpl
               stopRecording();
           },
           [this](const msg::AudioEngine::RecordingBufferRecorded& x) {
-              // Add buffer to current clip.
-              auto clipBeingRecordedBorrow = rse.borrowThenSet(appState.clipBeingRecorded);
-              if (!clipBeingRecordedBorrow->has_value()) {
+              auto& clipBeingRecordedConst = rse.get(appState.clipBeingRecorded);
+              if (!clipBeingRecordedConst.has_value()) {
                   LOG(INFO) << "RecordingBufferRecorded when not recording";
                   return;
               }
-              CHECK(clipBeingRecordedBorrow->has_value() && !(*clipBeingRecordedBorrow)->channels.empty());
-              (*clipBeingRecordedBorrow)->append(*x.recordingBuffer);
+              CHECK(!clipBeingRecordedConst->channels.empty());
+              // Add buffer to current clip.
+              auto clipBeingRecorded = rse.exchange(appState.clipBeingRecorded, nullopt);
+              clipBeingRecorded->append(*x.recordingBuffer);
+              auto numChannels = clipBeingRecorded->channels[0].size();
+              rse.setAsDifferent(appState.clipBeingRecorded, MOVE(clipBeingRecorded));
+
               x.recordingBuffer->sentToApp = false;
               LOG(INFO) << fmt::format(
                 "[{}]->sentToApp = false, {} ms",
                 fmt::ptr(x.recordingBuffer),
                 1000.0 * chr::duration<double>(chr::high_resolution_clock::now() - x.timestamp)
               );
-              rse.set(
-                appState.clipBeingRecordedSeconds,
-                (*clipBeingRecordedBorrow)->channels[0].size() / rse.get(appState.activeAudioDevices).sampleRate
-              );
+              rse.set(appState.clipBeingRecordedSeconds, numChannels / rse.get(appState.activeAudioDevices).sampleRate);
           },
           [this](const msg::AudioEngine::PlayedTime& x) {
               rse.set(appState.playedTime, x.t);
@@ -308,13 +303,13 @@ struct AppImpl
     void addTrack()
     {
         auto id = Id<Track>::make();
-        auto name = fmt::format("New track #{}", appState.nextNewTrackId++);
-        auto tracks = rse.get(appState.tracks);
-        CHECK(tracks.insert(pair(id, Track{MOVE(name)})).second);
-        rse.set(appState.tracks, MOVE(tracks));
-        auto trackOrder = appState.trackOrder;
-        trackOrder.push_back(id);
-        rse.set(appState.trackOrder, MOVE(trackOrder));
+        auto pairToInsert = pair(id, Track{fmt::format("New track #{}", rse.get(appState.nextNewTrackId))});
+
+        auto scopedUndoables = rse.beginUndoables();
+        CHECK(!rse.get(appState.tracks).contains(pairToInsert.first));
+        rse.insertWithUndo(appState.tracks, MOVE(pairToInsert));
+        rse.pushBackWithUndo(appState.trackOrder, id);
+        rse.setWithUndo(appState.nextNewTrackId, rse.get(appState.nextNewTrackId) + 1);
     }
     void receive(std::any&& msg) override
     {
@@ -352,9 +347,10 @@ struct AppImpl
 
         if (!rse.isUpToDate(appState.metronomeChanged)) {
             rse.updateIfNeeded(appState.metronomeChanged);
-            audioEngine->sendStateChangerFn([metronome = appState.metronome](AudioEngineState& s) {
-                s.metronome.on = metronome.on;
-                s.metronome.bpm = metronome.bpm();
+            auto& metronome = rse.get(appState.metronome);
+            audioEngine->sendStateChangerFn([on = metronome.on, bpm = metronome.bpm()](AudioEngineState& s) {
+                s.metronome.on = on;
+                s.metronome.bpm = bpm;
             });
         }
     }
@@ -384,7 +380,7 @@ struct AppImpl
     }
 };
 
-unique_ptr<App> App::make(UI* ui, AppState& appState, ReactiveStateEngine& rse)
+unique_ptr<App> App::make(UI* ui, AppState& appState)
 {
-    return make_unique<AppImpl>(ui, appState, rse);
+    return make_unique<AppImpl>(ui, appState);
 }

@@ -1,6 +1,5 @@
 #include "app/App.h"
 #include "common/AppState.h"
-#include "common/ReactiveStateEngine.h"
 #include "common/common.h"
 #include "common/msg.h"
 #include "platform/AppMsgQueue.h"
@@ -89,9 +88,8 @@ int main(int, char**)
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     AppState appState;
-    ReactiveStateEngine rse;
-    auto ui = UI::make(appState, rse);
-    auto app = App::make(ui.get(), appState, rse);
+    auto ui = UI::make(appState);
+    auto app = App::make(ui.get(), appState);
 
     auto amq = AppMsgQueue::make([app_ = app.get()](std::any&& msg) {
         app_->receive(MOVE(msg));

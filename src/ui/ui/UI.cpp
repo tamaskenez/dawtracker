@@ -36,9 +36,9 @@ struct UIImpl : public UI {
     const AppState& appState;
     ReactiveStateEngine& rse;
 
-    UIImpl(const AppState& appStateArg, ReactiveStateEngine& rseArg)
+    UIImpl(const AppState& appStateArg)
         : appState(appStateArg)
-        , rse(rseArg)
+        , rse(const_cast<ReactiveStateEngine&>(appState.rse))
     {
     }
 
@@ -131,7 +131,7 @@ struct UIImpl : public UI {
             ImGui::BeginDisabled();
         }
         auto recordButton = rse.get(appState.recordButton);
-        if (ImGui::Checkbox("Record", &recordButton)) {
+        if (ImGui::Checkbox("Record", &recordButton) && rse.get(appState.recordButtonEnabled)) {
             sendToApp(msg::Transport::record);
         }
         auto clipBeingRecordedSeconds = rse.get(appState.clipBeingRecordedSeconds);
@@ -156,10 +156,6 @@ struct UIImpl : public UI {
 
         if (!rse.get(appState.playButtonEnabled)) {
             ImGui::BeginDisabled();
-        }
-        auto playButton = rse.get(appState.playButton);
-        if (ImGui::Checkbox("Play", &playButton)) {
-            sendToApp(msg::Transport::play);
         }
         auto playedTime = rse.get(appState.playedTime);
         if (playedTime) {
@@ -389,7 +385,7 @@ struct UIImpl : public UI {
     }
 };
 
-unique_ptr<UI> UI::make(const AppState& appState, ReactiveStateEngine& rse)
+unique_ptr<UI> UI::make(const AppState& appState)
 {
-    return make_unique<UIImpl>(appState, rse);
+    return make_unique<UIImpl>(appState);
 }

@@ -30,8 +30,8 @@ AppState::AppState()
     auto ch = Section{.name = "Chorus", .structure = Bars{.bars = {Bar{.timeSignature = ts44}}}};
     for (auto& s : {v1, v2, ch}) {
         auto id = Id<Section>::make();
-        sections[id] = MOVE(s);
-        sectionOrder.push_back(id);
+        rse.insert(sections, pair(id, MOVE(s)));
+        rse.pushBack(sectionOrder, id);
     }
 }
 

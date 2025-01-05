@@ -2,6 +2,7 @@
 
 #include "AudioClip.h"
 #include "Id.h"
+#include "ReactiveStateEngine.h"
 #include "audiodevicetypes.h"
 #include "common.h"
 
@@ -66,6 +67,8 @@ struct AudioChannelPropertiesOnUI {
 struct AppState {
     AppState();
 
+    ReactiveStateEngine rse;
+
     struct AudioSettingsUI {
         vector<string> outputDeviceNames, inputDeviceNames;
         size_t selectedOutputDeviceIx = 0, selectedInputDeviceIx = 0;
@@ -73,8 +76,9 @@ struct AppState {
         const string& selectedOutputDeviceName() const;
         const string& selectedInputDeviceName() const;
         bool operator==(const AudioSettingsUI&) const = default;
-    } audioSettingsUI;
-    bool showAudioSettings = false;
+    };
+    rse::Computed<AudioSettingsUI> audioSettingsUI;
+    rse::Value<bool> showAudioSettings{false};
 
     struct Metronome {
         bool on = false;
@@ -82,30 +86,29 @@ struct AppState {
         TimeSignature timeSignature = TimeSignature{4, 4};
         Rational bpm() const;
         bool operator==(const Metronome&) const = default;
-    } metronome;
+    };
+    rse::Value<Metronome> metronome;
 
-    bool recordButtonEnabled = false, stopButtonEnabled = false, playButtonEnabled = false;
-    bool recordButton = false, stopButton = false, playButton = false;
+    rse::Computed<bool> recordButtonEnabled, stopButtonEnabled, playButtonEnabled;
+    rse::Computed<bool> recordButton, stopButton;
 
-    vector<AudioChannelPropertiesOnUI> inputs;
-    vector<AudioChannelPropertiesOnUI> outputs;
+    rse::Computed<vector<AudioChannelPropertiesOnUI>> inputs, outputs;
 
-    ActiveAudioDevices activeAudioDevices;
+    rse::Value<ActiveAudioDevices> activeAudioDevices;
 
-    monostate anyVariableDisplayedOnUIChanged;
-    monostate metronomeChanged;
+    rse::Computed<monostate> anyVariableDisplayedOnUIChanged, metronomeChanged;
 
-    optional<double> clipBeingRecordedSeconds;
-    optional<double> playedTime;
-    optional<AudioClip> clipBeingRecorded;
-    bool clipBeingPlayed = false;
+    rse::Value<optional<double>> clipBeingRecordedSeconds;
+    rse::Value<optional<double>> playedTime;
+    rse::Value<optional<AudioClip>> clipBeingRecorded;
+    rse::Value<bool> clipBeingPlayed{false};
 
-    unordered_map<Id<AudioClip>, AudioClip> clips;
-    unordered_map<Id<Section>, Section> sections;
-    vector<Id<Section>> sectionOrder;
-    int nextNewTrackId = 1;
-    unordered_map<Id<Track>, Track> tracks;
-    vector<Id<Track>> trackOrder;
+    rse::Value<unordered_map<Id<AudioClip>, AudioClip>> clips;
+    rse::Value<unordered_map<Id<Section>, Section>> sections;
+    rse::Value<vector<Id<Section>>> sectionOrder;
+    rse::UndoableValue<int> nextNewTrackId{1};
+    rse::UndoableValue<unordered_map<Id<Track>, Track>> tracks;
+    rse::UndoableValue<vector<Id<Track>>> trackOrder;
 
-    unordered_map<Id<ClipLink>, ClipLink> clipLinks;
+    rse::Value<unordered_map<Id<ClipLink>, ClipLink>> clipLinks;
 };

@@ -156,3 +156,10 @@ R intFromFloat(T t)
     assert(static_cast<T>(std::numeric_limits<R>::min()) <= t && t <= static_cast<T>(std::numeric_limits<R>::max()));
     return static_cast<R>(t);
 }
+
+template<class VectorLike>
+void sortUniqueInplace(VectorLike& v)
+{
+    ra::sort(v);
+    v.erase(ra::unique(v).begin(), v.end());
+}

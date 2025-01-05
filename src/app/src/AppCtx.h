@@ -20,6 +20,6 @@ struct AppCtx {
     unique_ptr<AudioEngine> audioEngine;
     unique_ptr<AudioIO> audioIO;
 
-    AppCtx(UI* uiArg, AppState& appState, ReactiveStateEngine& rse);
+    AppCtx(UI* uiArg, AppState& appState);
     ~AppCtx();
 };
