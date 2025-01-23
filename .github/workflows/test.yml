@@ -18,14 +18,15 @@ on:
           - 'v2 first option'
           - 'v2 second option'
 
+env:
+  v1_is_second: ${{ inputs.v1 == 'v1 second option' }}
+  v2_is_second: ${{ inputs.v2 == 'v2 second option' }}
+  v1s_and_v2s: ${{ env.v1_is_second && env.v2_is_second }}
+  v1s_or_v2s: ${{ env.v1_is_second && env.v2_is_second }}
+
 jobs:
   job1:
     runs-on: ubuntu-latest
-    env:
-      v1_is_second: ${{ inputs.v1 == 'v1 second option' }}
-      v2_is_second: ${{ inputs.v2 == 'v2 second option' }}
-      v1s_and_v2s: ${{ env.v1_is_second && env.v2_is_second }}
-      v1s_or_v2s: ${{ env.v1_is_second && env.v2_is_second }}
     steps:
       - run: |          
           echo "v1_is_second: $v1_is_second"
