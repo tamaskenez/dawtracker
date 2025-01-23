@@ -1,0 +1,35 @@
+name: Test variables
+
+on:
+  workflow_dispatch:
+    inputs:
+      v1:
+        required: true
+        default: 'v1 first option'
+        type: choice
+        options:
+          - 'v1 first option'
+          - 'v1 second option'
+      v2:
+        required: true
+        default: 'v2 first option'
+        type: choice
+        options:
+          - 'v2 first option'
+          - 'v2 second option'
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    env:
+      v1_is_second: ${{ inputs.v1 == 'v1 second option' }}
+      v2_is_second: ${{ inputs.v2 == 'v2 second option' }}
+      v1s_and_v2s: ${{ $v1_is_second && $v2_is_second }}
+      v1s_or_v2s: ${{ $v1_is_second && $v2_is_second }}
+    steps:
+      step1:
+        run: |          
+          echo "v1_is_second: $v1_is_second"
+          echo "v2_is_second: $v2_is_second"
+          echo "v1s_and_v2s: $v1s_and_v2s"
+          echo "v1s_or_v2s: $v1s_or_v2s"
