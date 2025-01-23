@@ -19,7 +19,7 @@ on:
           - 'v2 second option'
 
 jobs:
-  job:
+  job1:
     runs-on: ubuntu-latest
     env:
       v1_is_second: ${{ inputs.v1 == 'v1 second option' }}
@@ -27,9 +27,8 @@ jobs:
       v1s_and_v2s: ${{ $v1_is_second && $v2_is_second }}
       v1s_or_v2s: ${{ $v1_is_second && $v2_is_second }}
     steps:
-      step1:
-        - run: |          
-            echo "v1_is_second: $v1_is_second"
-            echo "v2_is_second: $v2_is_second"
-            echo "v1s_and_v2s: $v1s_and_v2s"
-            echo "v1s_or_v2s: $v1s_or_v2s"
+      - run: |          
+          echo "v1_is_second: $v1_is_second"
+          echo "v2_is_second: $v2_is_second"
+          echo "v1s_and_v2s: $v1s_and_v2s"
+          echo "v1s_or_v2s: $v1s_or_v2s"
