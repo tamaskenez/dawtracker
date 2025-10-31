@@ -18,6 +18,68 @@
   #include <SDL3/SDL_opengl.h>
 #endif
 
+namespace {
+UNUSED void h(int a, const char* b)
+{
+    fmt::println("{} {}", a, b);
+}
+template<class... Args>
+void f(const std::tuple<Args...>& args)
+{
+    h(get<0>(args), get<1>(args));
+}
+
+template<class T>
+struct Container{
+    using value_type=T;
+    T t;
+    Container()=default;
+    Container(const Container&)=delete;
+};
+
+struct A {
+    Container<int> a;
+    Container<const char*> b;
+};
+
+template<class... Args>
+auto makeArgs(Args&&... args)
+{
+    return std::tuple(std::addressof(args)...);
+}
+
+
+template<class T>
+const T& getTheValueOf(Container<T>& t)
+{
+    return t.t;
+}
+
+template<class T>
+using ValueTypeOfContainer_t = std::add_lvalue_reference_t<std::add_const_t<typename T::value_type>>;
+
+template<class T, class UpdaterFn, class... Args>
+void registerUpdater(UNUSED T& registree, std::tuple<Args...> argsTuple, UpdaterFn&& innerUpdaterFn)
+{
+    UNUSED auto f = std::function<void(ValueTypeOfContainer_t<Args>...)>(innerUpdaterFn);
+    UNUSED auto enclosingUpdaterFn = [&]() {
+              innerUpdaterFn(getTheValueOf(args)...);
+    };
+    enclosingUpdaterFn();
+}
+
+
+UNUSED void g()
+{
+    A a;
+    std::string c;
+    std::println("{} {}", (void*)(&a.a.t), (void*)(&a.b.t));
+    registerUpdater(c, std::tuple(&a.a, &a.b), []( auto&& pa,  auto&& pb) {
+        std::println("{} {}", (void*)(&pa), (void*)(&pb));
+    });
+}
+}
+
 namespace
 {
 constexpr auto k_minUIRefreshInterval = chr::milliseconds(50);
@@ -33,6 +95,7 @@ constexpr double k_refreshIntervalIncreaseFactorWhenNoEvents = 1.05;
 // Main code
 int main(int, char**)
 {
+    g();
     absl::InitializeLog();
     absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
 

@@ -1,11 +1,11 @@
 [requires]
-fmt/11.1.1
-gtest/1.15.0
-abseil/20240722.0
+fmt/11.2.0
+gtest/1.16.0
+abseil/20250127.0
 freetype/2.13.3
 concurrentqueue/1.0.4
 readerwriterqueue/1.0.6
-boost/1.86.0
+boost/1.88.0
 
 [generators]
 CMakeDeps

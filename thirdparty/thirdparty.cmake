@@ -5,7 +5,7 @@ set(PROJECTS
 )
 
 set(JUCE_GIT_REPOSITORY https://github.com/juce-framework/JUCE.git)
-set(JUCE_GIT_BRANCH develop)
+set(JUCE_GIT_BRANCH master)
 set(IMGUI_GIT_REPOSITORY https://github.com/ocornut/imgui.git)
 set(SDL3_GIT_REPOSITORY https://github.com/libsdl-org/SDL.git)
 

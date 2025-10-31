@@ -6,7 +6,7 @@
 //
 // - the user can register update functions for the fields
 // - the update functions query other fields in the struct and return the new value of the field they compute the value
-// for
+//   for
 // - this engine detects which field was needed to compute the value of which field
 // - when one field changes, automatically marks dependent fields dirty
 // - setting and getting the values of the fields must be done through the get/set methods of the engine
@@ -152,8 +152,7 @@ public:
     template<class V, class Fn>
     void registerUpdater(rse::Computed<V>& k, Fn computeFn)
     {
-        auto fn = function<V()>(MOVE(computeFn));
-        registerUpdaterCore(k, fn, nullopt);
+        registerUpdaterCore(k, function<V()>(MOVE(computeFn)), nullopt);
     }
 
     template<class V, class Fn, class... UpstreamNodes>

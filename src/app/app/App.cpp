@@ -339,7 +339,7 @@ struct AppImpl
             receiveAudioEngine(*g);
         } else if (auto* i = std::any_cast<msg::PlayClip>(&msg)) {
             playClip(i->id);
-        } else if (auto* j = std::any_cast<msg::AddTrack>(&msg)) {
+        } else if (std::any_cast<msg::AddTrack>(&msg)) {
             addTrack();
         } else {
             LOG(DFATAL) << fmt::format("Invalid message: {}", msg.type().name());
